@@ -1,10 +1,38 @@
-# MVP roadmap
+# Automated MVP Roadmap (Proposed)
 
-1. Define stable task/result/artifact contracts and security policy.
-2. Replace in-memory daemon task map with durable SQLite storage.
-3. Add MCP server with submit/get/cancel task tools.
-4. Build local dashboard for human-controlled ChatGPT handoff.
-5. Implement result import and artifact validation.
-6. Add tests, packaging and public installation docs.
+Goal: Codex -> MCP -> task queue -> unattended worker -> validated result -> Codex, with no routine copy/paste. The ChatGPT web worker is experimental and cannot be shipped without resolving provider permission and terms constraints.
 
-Current scaffold only implements a minimal local HTTP proof of concept; it is not a complete MVP.
+## Phase 0 — Feasibility gate
+- Assess provider terms and obtain authorization for automated ChatGPT web interaction/output extraction.
+- Test whether browser UI permits stable text and image artifact completion detection in an authorized environment.
+- Define failure states for challenges, session expiration, UI drift and access blocks.
+- Decision: if not permitted, keep automatic workflow using official APIs or local models; do not implement evasions.
+
+## Phase 1 — Core infrastructure
+- Stable MCP tool server and HTTP endpoints.
+- SQLite-backed queue, idempotency, cancellation and crash recovery.
+- Typed task/result/artifact schemas; integration tests.
+
+## Phase 2 — Browser worker spike (only if authorized)
+- Playwright browser lifecycle and persistent user-owned profile.
+- One-time user-initiated interactive sign-in, later unattended/headless execution where supported.
+- Capability-specific prompt submission and completion detection.
+- Worker error taxonomy; stop on challenge, account block or rate limit.
+
+## Phase 3 — Outputs
+- Text and structured code results.
+- Artifact capture and image MIME/size/hash validation.
+- Diff validation, worktree-safe application policy, result provenance.
+
+## Phase 4 — Agent integration
+- MCP examples for Codex and other clients.
+- Async polling and cancellation.
+- Local dashboard for status, onboarding, NEEDS_AUTH, and BLOCKED_BY_PROVIDER.
+
+## Phase 5 — Release
+- Security audit, provider permission confirmation, selector drift tests, documentation.
+- Installer, smoke tests, telemetry opt-in only.
+- No guarantee of ChatGPT Plus capacity, uptime or specific models.
+
+## Current implementation
+Only a development-only in-memory HTTP task prototype and schema package exist. No MCP server, Playwright worker, SQLite queue, dashboard or automated ChatGPT execution has been implemented.
