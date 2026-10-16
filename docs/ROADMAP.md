@@ -1,6 +1,6 @@
 # Automated MVP Roadmap (Proposed)
 
-Goal: Codex -> MCP -> task queue -> unattended worker -> validated result -> Codex, with no routine copy/paste. The ChatGPT web worker is experimental and cannot be shipped without resolving provider permission and terms constraints.
+Goal: any MCP/HTTP client -> task queue -> unattended worker -> validated result -> same client, with no routine copy/paste. Client integrations must remain optional and provider-neutral. The ChatGPT web worker is experimental and cannot be shipped without resolving provider permission and terms constraints.
 
 ## Phase 0 — Feasibility gate
 - Assess provider terms and obtain authorization for automated ChatGPT web interaction/output extraction.
@@ -25,7 +25,7 @@ Goal: Codex -> MCP -> task queue -> unattended worker -> validated result -> Cod
 - Diff validation, worktree-safe application policy, result provenance.
 
 ## Phase 4 — Agent integration
-- MCP examples for Codex and other clients.
+- Generic MCP and HTTP examples, with optional recipes for Claude Code, Gemini CLI, Codex and other clients.
 - Async polling and cancellation.
 - Local dashboard for status, onboarding, NEEDS_AUTH, and BLOCKED_BY_PROVIDER.
 
