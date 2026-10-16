@@ -1,16 +1,34 @@
 {
   "name": "chatgpt-wrapper",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "type": "module",
   "packageManager": "pnpm@10.0.0",
   "scripts": {
-    "dev": "pnpm --filter @chatgpt-wrapper/daemon dev",
-    "build": "pnpm -r build",
+    "dev": "pnpm build && pnpm --filter @chatgpt-wrapper/daemon dev",
+    "build": "pnpm -r build && node scripts/build-page-engine.mjs",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "start": "pnpm --filter @chatgpt-wrapper/daemon start",
+    "mcp": "node apps/daemon/dist/mcp.js",
+    "browser:install": "pnpm --filter @chatgpt-wrapper/daemon exec playwright install chromium",
+    "browser:login": "pnpm connect",
+    "connect": "pnpm build && pnpm browser:install && node apps/daemon/dist/browser-login.js",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm format:check && pnpm build && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
+    "prettier": "^3.9.10",
     "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "description": "Local MCP server for coding tasks through a persistent ChatGPT browser session",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rnaefe/chatgpt-wrapper.git"
   }
 }

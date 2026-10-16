@@ -147,3 +147,9 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Local task database, provider artifacts and API credentials
+.data/
+
+# macOS metadata
+.DS_Store
