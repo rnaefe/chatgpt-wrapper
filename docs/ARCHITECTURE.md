@@ -1,170 +1,72 @@
-# ChatGPT Wrapper — MVP Architecture
+# ChatGPT Wrapper — Automated Browser Worker Architecture (Experimental)
 
-Status: Proposed architecture (documentation only)
-Date: 2026-10-16
-Repository: rnaefe/chatgpt-wrapper
+Status: proposed, unimplemented, subject to provider permission and terms review.
+MVP focus: ChatGPT only. User requirement: zero manual handoff after initial authentication.
 
-## 1. Vision
+## Product objective
+Enable Codex and other agents to submit code, reasoning and image tasks over MCP/HTTP, with a local headless browser worker attempting execution and structured result retrieval.
 
-Build an open-source, local-first bridge that lets developer tools and AI agents delegate code generation, image generation, and reasoning tasks to capabilities a user already accesses in ChatGPT. Start with ChatGPT, but keep transport and provider boundaries replaceable.
+## Critical feasibility boundary
+ChatGPT Plus is not an API entitlement. OpenAI consumer Terms of Use restrict automatic or programmatic extraction of output. A Playwright-based unattended ChatGPT web adapter may conflict with those terms and is unsupported; this design is a technical proposal, **not authorization** to operate it or a promise of reliable access. Do not distribute/enable this adapter without resolving provider permission and legal/terms review. Never bypass anti-bot challenges, CAPTCHAs, rate limits, or account restrictions. An authorized API/local adapter is the production fallback.
 
-**Important product constraint:** ChatGPT Plus is not a general-purpose API subscription. Automating extraction of ChatGPT web output is restricted by OpenAI consumer Terms of Use. The MVP must not claim unattended ChatGPT web inference, scrape private endpoints, collect session cookies, bypass quotas, or impersonate an official integration. The ChatGPT web transport is user-mediated unless an authorized programmatic integration becomes available.
+## Proposed data flow
+Agent (Codex, Claude Code, custom client)
+-> MCP Server / loopback HTTP
+-> Capability Router
+-> Durable Task Queue (SQLite)
+-> Browser Worker Manager
+-> Playwright + persistent browser profile (headless where permitted)
+-> ChatGPT web session (experimental, subject to permission)
+-> Completion Detector / Output Extractor
+-> Result Normalizer + Artifact Store
+-> Validator
+-> MCP task result / artifact reference -> Agent
 
-## 2. MVP goals and exclusions
+## Components
+### 1. MCP Gateway
+Capabilities: code.generate, code.review, reason.analyze, image.generate, image.edit.
+Operations: submit_task, get_task, cancel_task, list_tasks, get_artifact.
+Asynchronous task IDs and polling; never block an MCP call for a long inference.
 
-### In scope
-- Local MCP server exposing capability-based tools.
-- Local HTTP task API for non-MCP clients.
-- Code generation, code review, reasoning, image generation and image-edit request envelopes.
-- User-mediated ChatGPT web handoff: compose prompt, open/copy, manually import result/artifact.
-- Persistent queue, task history, cancellation, timeout, validation and provenance.
-- Unified file/patch/image artifact contracts.
-- Optional automated adapter using an authorized API or local model, strictly opt-in.
-- Public open-source distribution; no hosted account service needed.
+### 2. Task Orchestrator
+SQLite durable jobs; states QUEUED, WAITING_FOR_WORKER, RUNNING, EXTRACTING, VALIDATING, COMPLETED, FAILED, CANCELLED, NEEDS_AUTH, NEEDS_HUMAN, BLOCKED_BY_PROVIDER. Idempotency keys, bounded retries for safe transient errors, per-account concurrency=1 by default, explicit deadlines. No quota circumvention.
 
-### Out of scope
-- Automated ChatGPT web UI scraping or undocumented endpoint calls.
-- Guaranteed Plus quotas, model selection or image extraction.
-- Full Codex replacement or autonomous shell execution.
-- Billing, centralized user accounts, cloud sync, multi-provider routing optimization.
+### 3. Browser Worker Manager (experimental)
+One isolated Playwright persistent browser context per local user profile. Initial sign-in occurs in a visible browser controlled by the user; never request passwords or export session cookies. Later sessions may run headless if supported and authorized. Handle browser lifecycle, profile locking, crash recovery, navigation timeouts, version compatibility and observable error states. No stealth plugins, fingerprint spoofing, challenge solving or automated account creation. A browser challenge or login expiration pauses the task and requests user intervention rather than bypassing it.
 
-## 3. Architecture
+### 4. ChatGPT Adapter (experimental)
+Capability negotiation, session readiness, prompt submission, completion detection, extraction of text and user-authorized generated artifacts, structured errors. UI selectors and response formats are volatile; treat changes as adapter errors, not as silent success. Distinguish streaming/incomplete text from completed response. Images require actual artifact retrieval and MIME verification; no fake image URL or textual substitute. Avoid undocumented private APIs.
 
-Client (Codex / Claude Code / IDE / custom agent)
-  -> MCP Server or Local HTTP API
-  -> Capability Router
-  -> Task Orchestrator / SQLite durable queue
-  -> Context Packager + Redaction
-  -> Provider Adapter
-     -> ChatGPT Web Handoff (user-controlled)
-     -> Authorized API Adapter (optional)
-     -> Local Model Adapter (optional)
-  -> Result Import / Normalizer
-  -> Artifact Store
-  -> Validator (schema / patch / MIME / scope)
-  -> Task Result back to client
+### 5. Context Packager
+Task-specific prompt template, repository context allowlist, file size limits, secret redaction, expected output schema, and acceptance criteria. Do not automatically send private code without user-approved scope.
 
-The bridge is **local-first**: binds to loopback by default, does not centralize credentials, and stores artifacts on the user's machine.
+### 6. Result Normalizer & Artifact Store
+Normalized result with task_id, capability, text, files, images, provenance, timestamps, errors, validation report. Store immutable SHA-256 addressed files locally; imported/generated artifacts carry source provenance and content type.
 
-## 4. Component responsibilities
+### 7. Validation / Integration
+Validate JSON and patch syntax, path allowlist, MIME, file integrity and size. Apply patches only in isolated worktree with explicit policy; never execute model output without authorization.
 
-### MCP Server
-Tools: `submit_task`, `get_task`, `list_tasks`, `cancel_task`, `get_artifact`, `import_result`.
-Tool calls return task IDs promptly. Polling avoids long-lived MCP timeouts. Capability names are stable, independent of provider/model.
+### 8. Observability
+Task history, per-step timings, retry reasons, selector drift, worker health, session status, output validation, manual intervention events. Do not claim access to real Plus quota telemetry. Local task counters are not subscription usage.
 
-### Local HTTP API
-`POST /v1/tasks`, `GET /v1/tasks/:id`, `GET /v1/tasks`, `POST /v1/tasks/:id/cancel`, `POST /v1/tasks/:id/results`, `GET /v1/artifacts/:id`, `GET /health`.
-Local API uses a generated secret or local OS access controls. No unauthenticated LAN exposure.
+## MVP interfaces
+HTTP: POST /v1/tasks; GET /v1/tasks/:id; GET /v1/tasks; POST /v1/tasks/:id/cancel; GET /v1/artifacts/:id; GET /health.
+MCP: submit_task, get_task, cancel_task, list_tasks, get_artifact.
+Worker internal contract: start(task), status(task), cancel(task), collect(task), capabilities().
 
-### Capability Router
-Selects a compatible adapter by requested capability, explicit user preference, supported input/output types, and authorization. Never silently substitute an unavailable capability. Report unsupported features explicitly.
+## Planned repository modules
+apps/daemon — MCP and HTTP gateway, worker manager.
+apps/dashboard — local status, onboarding, auth-required and blocked-task UI.
+packages/contracts — task, result, artifact schemas.
+packages/core — durable queue, state machine, scheduler.
+packages/adapters — experimental browser adapter and authorized fallback.
+packages/validation — patch and image validators.
 
-### Task Orchestrator
-Persists state, enforces bounded queue sizes and concurrency, handles retries only for transient transport errors, and never duplicates a task automatically after an uncertain completion.
+## Nonfunctional requirements
+Local-first; bind loopback; Origin checks and local API auth; encryption or OS permissions for profile; no credential export; safe retention; no central telemetry by default. Browser profiles are sensitive and must not be committed or logged.
 
-### Context Packager
-Uses explicit file allowlists, byte limits and secret detection. Generates a self-contained prompt with objective, constraints, acceptance criteria and output contract. Sensitive source files require explicit user review before handoff.
+## Exit criteria for research spike
+Demonstrate a permissioned end-to-end text task with stable completion detection; document ToS review; demonstrate clear NEEDS_AUTH and BLOCKED_BY_PROVIDER behavior; verify artifact integrity for an image task; prove retries do not duplicate jobs. If permission is unavailable, do not enable the browser adapter: keep MCP/queue architecture and use authorized providers.
 
-### ChatGPT Web Handoff
-Presents task packages in a local dashboard. User opens ChatGPT, submits the prompt, then imports copied text, downloaded image or patch. No automatic DOM reading, cookie extraction, browser profile cloning or programmatic ChatGPT response harvesting. Selected ChatGPT model/mode is user-controlled and not verifiable by the bridge.
-
-### Artifact Store
-Stores immutable content-addressed artifacts under a local application data directory; SQLite holds metadata and references. Supported types: text, JSON, unified diff, source file, PNG/JPEG/WebP. Validate MIME, size, hash, origin and filesystem path before consumption.
-
-### Validation
-Code: schema, permitted file paths, patch syntax, git apply --check, targeted tests in isolated worktree when requested. Image: MIME, dimensions, file integrity, size. Never execute imported code automatically; test execution requires explicit policy/approval.
-
-## 5. Data contracts
-
-Task:
-- id, capability, objective, input references, context references
-- output format, acceptance criteria, allowed paths
-- adapter, state, timestamps, deadline, retry count
-- provenance, error code, artifact IDs
-
-Result:
-- task_id, status, output artifacts, summary, assumptions, warnings
-- provenance: user_imported | authorized_api | local_model
-- validation report and integration readiness
-
-Task states:
-CREATED -> PACKAGED -> AWAITING_USER -> RUNNING_EXTERNAL -> RESULT_IMPORTED -> VALIDATING -> COMPLETED.
-Terminal alternatives: FAILED, CANCELLED, TIMED_OUT, REJECTED.
-`RUNNING_EXTERNAL` is advisory for manual ChatGPT handoff, not automatically observed.
-
-## 6. Capability definitions
-
-- `code.generate`: source files or unified diff; file allowlist mandatory for patch application.
-- `code.review`: structured findings with severity and file/line references where provided.
-- `reason.analyze`: text or validated JSON response.
-- `image.generate`: user-imported image artifact and metadata.
-- `image.edit`: user-supplied source image, requested edit, imported result.
-
-Do not expose tool calling or streaming as supported for manual ChatGPT transport. Streaming is adapter-dependent. Image generation success requires a real imported image, not a textual description.
-
-## 7. Repository layout (planned; no implementation in this document)
-
-- `docs/ARCHITECTURE.md` — this document
-- `docs/PROTOCOL.md` — task, result and artifact schemas
-- `docs/SECURITY.md` — trust boundaries and threat model
-- `docs/ROADMAP.md` — implementation milestones
-- `apps/daemon/` — local runtime, HTTP and MCP
-- `apps/dashboard/` — task handoff and import UI
-- `packages/contracts/` — shared types and schemas
-- `packages/core/` — orchestration, routing and storage
-- `packages/adapters/` — replaceable transport adapters
-- `packages/validation/` — artifact and patch checks
-
-## 8. Technology decisions
-
-- TypeScript monorepo with pnpm.
-- Node.js LTS, Fastify for HTTP, official MCP TypeScript SDK.
-- SQLite with WAL for durable local task state.
-- Zod for input/output schema validation.
-- React + Vite for local dashboard.
-- Filesystem-backed artifact store with SHA-256 references.
-- Vitest for contract, queue and adapter tests.
-
-Avoid Redis, Kubernetes, hosted infrastructure and a mandatory browser extension in the MVP.
-
-## 9. Security and privacy
-
-Trust boundaries: untrusted agent prompts, untrusted imported model outputs, user repository, local daemon, external provider. Treat imported output as data until validated. Default deny shell execution and filesystem writes outside approved worktree. Redact secrets; never collect ChatGPT passwords, session tokens or cookies. Bind loopback; protect HTTP endpoints against cross-origin and DNS rebinding attacks. Keep telemetry off by default. Store provenance and user consent for external sharing. Provide deletion and retention controls.
-
-## 10. Reliability and observability
-
-Track task latency, queue time, completion/failure rate, manual handoff duration, adapter failures and artifact validation errors. Usage counters are **local task counts**, not actual ChatGPT subscription quotas. No fabricated token usage, model identity or quota remaining. Support crash recovery, idempotency keys and bounded retention.
-
-## 11. Delivery phases
-
-**P0 — Contracts:** define capability schema, task state machine, error taxonomy and threat model.
-**P1 — Local daemon:** MCP, HTTP, SQLite queue, local dashboard and task history.
-**P2 — ChatGPT handoff:** prompt packaging, user-controlled transfer, result import and artifact storage.
-**P3 — Validation:** patch/image validation, safe worktree integration and provenance.
-**P4 — Optional automation:** authorized API/local-model adapter with identical contracts.
-**P5 — Public release:** installers, documentation, security review, tests and sample integrations.
-
-## 12. Acceptance criteria for MVP
-
-1. An MCP client submits a code task and receives a durable task ID.
-2. User can transfer the task to ChatGPT and import a result.
-3. A validated patch is returned as an artifact; invalid or out-of-scope patches are rejected.
-4. User can request an image and import a genuine image artifact.
-5. Tasks survive daemon restart and can be cancelled.
-6. The bridge never requires ChatGPT credentials or claims unattended Plus inference.
-7. Public documentation clearly distinguishes user-mediated ChatGPT from authorized automatic adapters.
-
-## 13. Open decisions
-
-- Product name and npm package scope.
-- GPL-3.0 retention versus relicensing (requires rights review).
-- CLI-only versus dashboard-first onboarding.
-- Whether to add a browser extension limited to user-initiated handoff.
-- Explicit permission/authorization requirements before any future automatic ChatGPT integration.
-
-## 14. References
-
-- OpenAI consumer Terms of Use: https://openai.com/en-GB/policies/row-terms-of-use/
-- OpenAI Service Terms: https://openai.com/en-GB/policies/service-terms/
-
-This architecture is a proposed product specification, not a claim that ChatGPT Plus supports programmatic access.
+## Non-goals
+No quota bypass, CAPTCHA solving, anti-detection, mass account use, credential harvesting, hidden API exploitation, or misleading claims that Plus includes API access.
