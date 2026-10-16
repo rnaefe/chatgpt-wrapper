@@ -4,13 +4,13 @@ Status: proposed, unimplemented, subject to provider permission and terms review
 MVP focus: ChatGPT only. User requirement: zero manual handoff after initial authentication.
 
 ## Product objective
-Enable Codex and other agents to submit code, reasoning and image tasks over MCP/HTTP, with a local headless browser worker attempting execution and structured result retrieval.
+Expose ChatGPT capabilities as a standalone, client-agnostic tool over MCP and HTTP. Any compatible client—Claude Code, Gemini CLI, Codex, Cursor, scripts, or custom agents—can submit code, reasoning, and image tasks. The wrapper does not orchestrate client agents or own their project workflows. A local headless browser worker is a proposed experimental execution transport.
 
 ## Critical feasibility boundary
 ChatGPT Plus is not an API entitlement. OpenAI consumer Terms of Use restrict automatic or programmatic extraction of output. A Playwright-based unattended ChatGPT web adapter may conflict with those terms and is unsupported; this design is a technical proposal, **not authorization** to operate it or a promise of reliable access. Do not distribute/enable this adapter without resolving provider permission and legal/terms review. Never bypass anti-bot challenges, CAPTCHAs, rate limits, or account restrictions. An authorized API/local adapter is the production fallback.
 
 ## Proposed data flow
-Agent (Codex, Claude Code, custom client)
+Any MCP/HTTP client (agent, IDE, CLI, script, application)
 -> MCP Server / loopback HTTP
 -> Capability Router
 -> Durable Task Queue (SQLite)
@@ -20,7 +20,10 @@ Agent (Codex, Claude Code, custom client)
 -> Completion Detector / Output Extractor
 -> Result Normalizer + Artifact Store
 -> Validator
--> MCP task result / artifact reference -> Agent
+-> MCP/HTTP task result or artifact reference -> requesting client
+
+## Product boundary
+The wrapper owns task intake, validation, execution transport, status, output normalization and artifact delivery. The client owns prompt planning, agent orchestration, repository editing, applying patches, and downstream execution. Do not add client-specific dependencies or Codex-specific workflow assumptions. MCP and HTTP are first-class interfaces; neither client is privileged.
 
 ## Components
 ### 1. MCP Gateway
