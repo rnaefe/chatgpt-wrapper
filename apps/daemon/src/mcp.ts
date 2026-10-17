@@ -58,18 +58,25 @@ server.registerTool(
 server.registerTool(
   "get_artifact",
   {
-    description: "Read the text artifact from a completed task.",
+    description: "Read a completed text artifact or an image artifact (base64-encoded MCP image content).",
     inputSchema: { id: z.string().regex(/^[a-f0-9]{64}$/) },
   },
   async ({ id }) => {
     const response = await api(`/v1/artifacts/${id}`);
     const data = Buffer.from(await response.arrayBuffer());
-    if (data.length > 5 * 1024 * 1024)
+    const mime = (response.headers.get("content-type") ?? "application/octet-stream").split(";")[0].trim();
+    if (data.length > 10 * 1024 * 1024)
       return result({
         id,
-        message:
-          "Artifact exceeds MCP delivery limit; download through authenticated HTTP endpoint",
+        error: "ARTIFACT_TOO_LARGE",
+        message: "Artifact exceeds the 10 MiB MCP delivery limit; retrieve it through the authenticated loopback HTTP endpoint.",
       });
+    if (mime.startsWith("image/"))
+      return {
+        content: [{ type: "image" as const, data: data.toString("base64"), mimeType: mime }],
+      };
+    if (!mime.startsWith("text/"))
+      return result({ id, error: "UNSUPPORTED_ARTIFACT_TYPE", mime });
     return {
       content: [{ type: "text" as const, text: data.toString("utf8") }],
     };

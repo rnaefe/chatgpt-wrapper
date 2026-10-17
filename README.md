@@ -2,7 +2,7 @@
 
 A local MCP server that sends coding and analysis tasks to ChatGPT through a visible Playwright browser and returns completed responses as Markdown.
 
-**Experimental.** The default is a visible browser with manual sign-in and verification. A live MCP code task completed using the same visible session on 2026-10-17. Headless mode remains optional and currently encounters provider browser verification.
+**Experimental.** Initial sign-in is visible; subsequent tasks run headlessly by default. Headless execution may encounter provider browser verification. A live MCP code task completed in visible mode on 2026-10-17. Set `BROWSER_HEADLESS=false` for visible tasks if headless execution is blocked; do not attempt to bypass browser verification.
 
 ## Connect once
 
@@ -51,7 +51,7 @@ Example `submit_task` arguments:
 
 Poll the returned ID with `get_task`. A nonempty response is not enough: the worker waits for a completed assistant turn before returning it. Results preserve Markdown and code fences. The client decides whether to apply generated code; Wrapper never edits your repository or executes generated commands.
 
-Tasks may include up to eight image inputs using a local path, base64 data, or an HTTPS URL:
+Tasks may include up to eight image inputs using a local path, base64 data, or an HTTPS URL. For safety, local paths require an explicit `IMAGE_INPUT_ROOTS` allowlist and HTTPS URLs require an explicit `ALLOWED_IMAGE_HOSTS` allowlist in `.env`. Base64 inputs require neither allowlist:
 
 ```json
 {
@@ -74,7 +74,7 @@ Use the dedicated `image.generate` capability when an image must be created:
 
 ## Local configuration
 
-No `.env` is required. Optional settings: `DATA_DIR`, `PORT` (default 11435), and `BROWSER_HEADLESS=false` to keep task execution visible instead of headless. Authentication lives in a separate private profile under `.data/playwright-profile`; it is never imported from your everyday browser or exported. Keep this directory private.
+No `.env` is required for text tasks. Optional settings: `DATA_DIR`, `PORT` (default 11435), and `BROWSER_HEADLESS=false` to keep task execution visible. To allow local image inputs, set `IMAGE_INPUT_ROOTS` to a comma-separated list of trusted absolute directories; symlink escapes are rejected. To allow HTTPS image URL inputs, set `ALLOWED_IMAGE_HOSTS` to comma-separated exact trusted hostnames (no wildcards or redirects). `TASK_RETENTION_DAYS` defaults to 30 and accepts 0 (disable) through 3650. Authentication lives in a separate private profile under `.data/playwright-profile`; it is never imported from your everyday browser or exported. Keep this directory private.
 
 The worker uses an authenticated loopback transport internally so MCP clients share one SQLite queue. One task runs at a time; sign-in pauses task dispatch. Interrupted or ambiguous submissions are never replayed automatically.
 
@@ -100,6 +100,6 @@ Tests cover the durable queue, MCP, cancellation, browser lifecycle, onboarding,
 | `BROWSER_START_FAILED` | Install Chromium and close another process using the same Wrapper profile                                                                                                   |
 | `WORKER_RESTARTED`     | Review the previous task before submitting a new one; it was not replayed                                                                                                   |
 
-Runtime data stays on disk until you remove it. Stop the worker before deleting its data directory; deleting the profile requires a new sign-in.
+Terminal task history and unreferenced artifacts are pruned after the configured retention period. Browser credentials, logs and other runtime files remain until manually deleted. Stop the worker before deleting its data directory; deleting the profile requires a new sign-in. Image artifacts returned by `get_artifact` use standard MCP base64 image content; large artifacts may require authenticated HTTP retrieval.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development and [security notes](docs/SECURITY.md) for credential handling. Licensed under the [GNU GPL v3](LICENSE).

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, writeFileSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, statSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 const mocks = vi.hoisted(() => ({ launch: vi.fn() }));
@@ -9,6 +9,8 @@ vi.mock("playwright", () => ({
 import {
   PlaywrightAdapter,
   profileDirectory,
+  validateImagePath,
+  validateImageUrl,
 } from "../src/playwright-adapter.js";
 const directories: string[] = [];
 function setup() {
@@ -141,7 +143,16 @@ it("keeps the visible login context for subsequent MCP tasks", async () => {
     await connected;
     expect(adapter.status().state).toBe("READY");
     expect(close).not.toHaveBeenCalled();
+    const taskPageClose = vi.fn().mockResolvedValue(undefined);
+    const newPage = vi.fn(async () => ({
+      ...page,
+      close: taskPageClose,
+    }));
+    Object.assign(context, { newPage });
     await adapter.execute(request, new AbortController().signal);
+    await adapter.execute(request, new AbortController().signal);
+    expect(newPage).toHaveBeenCalledTimes(2);
+    expect(taskPageClose).toHaveBeenCalledTimes(2);
     expect(mocks.launch).toHaveBeenCalledOnce();
     expect(mocks.launch).toHaveBeenCalledWith(
       expect.any(String),
@@ -153,4 +164,46 @@ it("keeps the visible login context for subsequent MCP tasks", async () => {
   } finally {
     vi.useRealTimers();
   }
+});
+
+describe("image input boundaries", () => {
+  it("requires explicit HTTPS host allowlisting", () => {
+    const previous = process.env.ALLOWED_IMAGE_HOSTS;
+    try {
+      delete process.env.ALLOWED_IMAGE_HOSTS;
+      expect(() => validateImageUrl("https://images.example.test/a.png")).toThrow();
+      process.env.ALLOWED_IMAGE_HOSTS = "images.example.test";
+      expect(validateImageUrl("https://images.example.test/a.png").hostname).toBe("images.example.test");
+      expect(() => validateImageUrl("https://internal.example.test/a.png")).toThrow();
+      expect(() => validateImageUrl("https://images.example.test:8443/a.png")).toThrow();
+      expect(() => validateImageUrl("https://user:secret@images.example.test/a.png")).toThrow();
+    } finally {
+      if (previous === undefined) delete process.env.ALLOWED_IMAGE_HOSTS;
+      else process.env.ALLOWED_IMAGE_HOSTS = previous;
+    }
+  });
+
+  it("limits local images to real files within the configured roots and rejects symlink escapes", async () => {
+    const { dir } = setup();
+    const other = mkdtempSync(join(tmpdir(), "wrapper-secret-"));
+    directories.push(other);
+    const good = join(dir, "good.png");
+    const secret = join(other, "secret.png");
+    const linked = join(dir, "escape.png");
+    writeFileSync(good, Buffer.from([137, 80, 78, 71]));
+    writeFileSync(secret, Buffer.from([137, 80, 78, 71]));
+    symlinkSync(secret, linked);
+    const previous = process.env.IMAGE_INPUT_ROOTS;
+    try {
+      delete process.env.IMAGE_INPUT_ROOTS;
+      await expect(validateImagePath(good)).rejects.toMatchObject({ code: "IMAGE_PATH_NOT_ALLOWED" });
+      process.env.IMAGE_INPUT_ROOTS = dir;
+      await expect(validateImagePath(good)).resolves.toBe(good);
+      await expect(validateImagePath(secret)).rejects.toMatchObject({ code: "IMAGE_PATH_NOT_ALLOWED" });
+      await expect(validateImagePath(linked)).rejects.toMatchObject({ code: "IMAGE_PATH_NOT_ALLOWED" });
+    } finally {
+      if (previous === undefined) delete process.env.IMAGE_INPUT_ROOTS;
+      else process.env.IMAGE_INPUT_ROOTS = previous;
+    }
+  });
 });

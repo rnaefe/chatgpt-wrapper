@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install browser and system dependencies
+        run: pnpm --filter @chatgpt-wrapper/daemon exec playwright install --with-deps chromium
+      - name: Format source in the ephemeral runner
+        run: pnpm format
+      - name: Build, typecheck and run tests
+        run: pnpm build && pnpm typecheck && pnpm test
