@@ -1,0 +1,30 @@
+[
+  {
+    "seconds": 4,
+    "caption": "ChatGPT through MCP. Send work from your coding client and get code, analysis and images back."
+  },
+  {
+    "seconds": 6,
+    "caption": "A local bridge connects your MCP client, a durable SQLite queue and your saved ChatGPT browser session."
+  },
+  {
+    "seconds": 8,
+    "caption": "Actual captured TypeScript output. This recorded run completed in 10.6 seconds; timing varies. Waiting is shortened."
+  },
+  {
+    "seconds": 6,
+    "caption": "An actual image generated through Wrapper. Image delivery includes a local file and chat display/download links."
+  },
+  {
+    "seconds": 6,
+    "caption": "Six development task types: code generation, code review, reasoning, image generation, image analysis and image editing. Provider UI availability varies."
+  },
+  {
+    "seconds": 6,
+    "caption": "Local fixture benchmark: median queue, validation and persistence improved from 244 to 1.7 milliseconds. Twelve samples; browser and provider time excluded."
+  },
+  {
+    "seconds": 4,
+    "caption": "Build from source at github.com/rnaefe/chatgpt-wrapper. Requires Node.js 24 and your ChatGPT account. Sign-in and provider verification remain manual."
+  }
+]

@@ -1,21 +1,47 @@
-# Wrapper onboarding demo
+# Wrapper product film
 
-A 38-second, silent Remotion composition at 1920×1080 / 30 fps. It uses captured development-build CLI output and a real public MCP task result, rendered into terminal panels. This is not a desktop screen recording.
+A 40-second Remotion film at 1920×1080 / 30 fps, with an original 120 BPM electronic score, beat-aligned scenes, kinetic typography and real Wrapper outputs. The film is a designed product presentation, not an uncut screen recording.
 
-The footage uses a saved ChatGPT session. First-login UI is not shown. Local paths and install chatter are omitted; idle time is shortened. The CLI presentation is an unreleased preview, while the closing install command points to the existing 0.4.2 release.
+## Evidence behind the film
 
-## Render the captured run
+- The TypeScript source and 10.6-second timing come from the existing recorded public provider run in `public/session.json`. This is one run, not a speed guarantee. The tool sequence shown is the current development workflow.
+- `public/istanbul-cat.png` is an image generated through Wrapper for this development session. The display/download treatment is a conceptual presentation of the implemented delivery metadata.
+- The 244 → 1.7 ms comparison is a twelve-task local fixture benchmark. It measures queue, validation and persistence, excluding browser startup and provider generation. See [performance evidence](../docs/PERFORMANCE.md).
+- The six capabilities belong to the development source. Image analysis and editing have schema/worker/browser fixture coverage. A live analysis probe could not confirm submission, and a subsequent read-only check encountered provider verification. The film does not claim live verification for those two modes.
+
+No credentials, account UI, private prompts, or browser profiles are included. Text is self-contained without audio. Captions are generated from `public/storyboard.json`. The README shows a static poster and places its four-second animated preview inside an explicit disclosure.
+
+## Render
 
 ```sh
 cd video
 npm ci
+npm run typecheck
 npm run studio
 npm run render
+npm run publish-assets
 ```
 
-`npm run poster` renders a static frame. The captured public output is in `public/session.json`; rendering it does not access an account. Fonts are loaded using `@remotion/google-fonts`. The first render may need network access to obtain fonts and a compatible browser. `--browser-executable=/absolute/path/to/chrome` can select an existing browser.
+`publish-assets` renders the MP4, poster, four-second GIF, and captions into `docs/assets`. It checks 1080p dimensions, stereo audio and timeline duration. Set `REMOTION_BROWSER_EXECUTABLE` to an existing Chromium executable if needed. Fonts use `@remotion/google-fonts`; the initial render can require network access.
 
-## Capture another real run
+A gentler version removes transform animations while retaining fades:
+
+```sh
+npx remotion render src/Root.tsx WrapperDemo out/calm.mp4 --props='{"reducedMotion":true}'
+```
+
+## Music
+
+`public/score.m4a` is an original procedural score created for this demo, with bass, percussion, arpeggios and scene accents. No third-party recordings or samples are used. The source is `scripts/score.py` (requires Python and NumPy). Rebuild it with:
+
+```sh
+python3 scripts/score.py
+ffmpeg -y -i out/score.wav -af loudnorm=I=-16:TP=-1.5:LRA=8 -ar 48000 -c:a aac -b:a 192k public/score.m4a
+```
+
+The score is normalized to a target of -16 LUFS, then mixed at 80% in the film. Audio is AAC stereo; the MP4 uses H.264 with yuv420p. Assets and source are covered by the repository license.
+
+## Capture another real code run
 
 Build the root project, then explicitly select your private signed-in profile:
 
@@ -24,12 +50,6 @@ pnpm build
 DEMO_SESSION_DIR=/absolute/path/to/private-data node video/scripts/capture.mjs
 ```
 
-Optionally set `DEMO_SESSION_PORT` (default 11435). Capture sends one fixed public TypeScript prompt to ChatGPT; it never retries the prompt. It tests setup against a separate temporary Codex config and removes that test data afterwards. It does not modify your normal Codex config or copy/export your saved session. Confirm you are allowed to automate the selected account.
+The capture script sends one fixed public TypeScript prompt and never resubmits it. It uses a separate temporary Codex config, preserves your normal config, and never copies your saved profile into this directory. Review `public/session.json` before sharing a new recording.
 
-Review `public/session.json` before sharing it. It should contain only selected CLI status lines and the public task result, never a token, profile, private prompt or account screenshot.
-
-## Assets and accessibility
-
-The README uses a static poster by default and puts the animated GIF behind an explicit disclosure. The MP4 has no voiceover or music; scene text provides the explanation. `captions.vtt` supplies an optional text track. Downloadable video and GIF files live in `docs/assets` and are excluded from the npm distribution.
-
-The workflow follows [Leihyn's demo-video skill](https://github.com/Leihyn/claude-demo-video-skill), adapted to a short terminal-first walkthrough. No skill files or external recordings are vendored. Video source and scripts are maintained separately from the product's runtime dependencies.
+The original onboarding workflow drew from [Leihyn's demo-video skill](https://github.com/Leihyn/claude-demo-video-skill). The current film, visual system and score are maintained in this repository; no external skill files or recordings are vendored.

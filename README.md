@@ -4,16 +4,16 @@ Use your ChatGPT browser session from an MCP coding client. Wrapper queues a tas
 
 [Install](docs/INSTALLATION.md) · [npm](https://www.npmjs.com/package/@rnaefe/chatgpt-wrapper) · [Releases](https://github.com/rnaefe/chatgpt-wrapper/releases) · [Contribute](CONTRIBUTING.md)
 
-[![Watch the onboarding demo](docs/assets/wrapper-demo.png)](docs/assets/wrapper-demo.mp4)
+[![Watch the product demo with music](docs/assets/wrapper-demo.png)](docs/assets/wrapper-demo.mp4)
 
-**[Watch the 38-second demo](docs/assets/wrapper-demo.mp4)** · [Captions](docs/assets/captions.vtt) · [Video source](video/README.md)
+**[Watch the 40-second demo with music](docs/assets/wrapper-demo.mp4)** · [Captions](docs/assets/captions.vtt) · [Video source](video/README.md)
 
-Actual development-build CLI output and a live MCP result, rendered as a video. Uses a saved session; first-login UI is not recorded. Local paths and waiting are shortened. The CLI presentation previews unreleased changes.
+A 1080p product film with an original electronic score, actual captured code output, a Wrapper-generated image and a local queue benchmark. Designed scenes show the development workflow; this is an edited presentation, not an uncut screen recording. [Evidence and rendering details](video/README.md).
 
 <details>
 <summary>Play the animated preview</summary>
 
-![Animated walkthrough of setup, saved-session connection and a completed MCP task](docs/assets/wrapper-demo.gif)
+![Four-second animated preview of the Wrapper product film](docs/assets/wrapper-demo.gif)
 
 </details>
 
@@ -33,7 +33,7 @@ npx -y @rnaefe/chatgpt-wrapper@0.4.2
 
 For example:
 
-> Use Wrapper to generate a TypeScript LRU cache with a usage example. Poll the task until it finishes, then show me the result.
+> Use Wrapper to generate a TypeScript LRU cache with a usage example. Use wait_task until it finishes, then show me the result.
 
 The browser opens while each task runs and closes afterwards. Your saved session is reused. Generated code is returned for review; Wrapper does not execute commands or modify your repository.
 
@@ -74,13 +74,21 @@ One worker processes one task at a time. Clients share the authenticated loopbac
 | -------------- | ---------------------------------------------- |
 | `submit_task`  | Queue a coding, review, analysis or image task |
 | `get_task`     | Read status, response and event history        |
+| `wait_task`    | Await completion for up to 30 seconds          |
+| `get_status`   | Inspect readiness, capabilities and queue      |
 | `list_tasks`   | Browse tasks, with optional status filtering   |
 | `cancel_task`  | Cancel queued or running work                  |
 | `get_artifact` | Read a stored text or image result             |
 | `get_metrics`  | Inspect success rates and task durations       |
 | `list_errors`  | Inspect recent task IDs and error codes        |
 
-See the [MCP usage guide](docs/MCP.md) for request examples and status handling.
+Tasks support code generation, code review, reasoning, image generation, image analysis and image editing. Analysis and editing require input images. Image results include local files and Markdown links for chat delivery.
+
+See the [MCP usage guide](docs/MCP.md) for request examples and status handling. Local queue measurements and their limits are documented in [performance](docs/PERFORMANCE.md).
+
+## Development improvements
+
+The working source adds image analysis/editing, long-poll task waiting, chat-ready image exports and task-specific prompt contracts. Prompts preserve objectives and constraints in JSON, request the appropriate deliverable for each capability, and distinguish evidence from assumptions. Prompt wording is not a security boundary or a substitute for reviewing results.
 
 ## What is verified
 

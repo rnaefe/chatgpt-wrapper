@@ -100,9 +100,11 @@ try {
   while (["QUEUED", "RUNNING", "VALIDATING"].includes(task.status)) {
     if (Date.now() - started > 110000)
       throw Error("Demo deadline exceeded; task is not resubmitted.");
-    await new Promise((r) => setTimeout(r, 1000));
     task = unpack(
-      await client.callTool({ name: "get_task", arguments: { id: task.id } }),
+      await client.callTool({
+        name: "wait_task",
+        arguments: { id: task.id, waitMs: 30000 },
+      }),
     );
   }
   if (task.status !== "COMPLETED")

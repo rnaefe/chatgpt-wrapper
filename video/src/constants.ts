@@ -1,10 +1,13 @@
+import storyboard from "../public/storyboard.json";
 export const colors = {
-  background: "#09090b",
-  panel: "#111416",
-  panelHeader: "#181d20",
-  text: "#f0f3f0",
-  muted: "#9ba69f",
-  green: "#9be6b1",
-  line: "#29312e",
+  background: "#0a0c11",
+  panel: "#141820",
+  text: "#f2f0e8",
+  muted: "#a2a8b4",
+  accent: "#d2ff5a",
+  violet: "#aaa2ff",
+  line: "#303643",
 };
-export const scenes = [3, 10, 5, 12, 4, 4];
+export const scenes = storyboard.map((scene) => scene.seconds);
+export const fps = 30;
+export const duration = scenes.reduce((sum, seconds) => sum + seconds, 0) * fps;

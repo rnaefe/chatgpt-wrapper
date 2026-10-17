@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Add image analysis and editing, requiring image references and the appropriate output artifacts.
+- Wake the queue on committed task changes and add `wait_task` and `get_status` MCP tools.
+- Export image artifacts as private local files with Markdown display/download links, including images over the inline limit.
+- Separate browser image I/O, prompt contracts, DOM Markdown, MCP registration and metric aggregation into focused modules.
+- Preserve task objectives and constraints in a JSON prompt envelope with capability-specific output expectations.
+- Propagate task cancellation into remote image downloads; index task event history and avoid empty text artifacts for image-only results.
+- Prevent reference attachments and streaming previews from being returned as finished generated images.
+- Replace the silent onboarding video with a 40-second 1080p product film, original music, captions and reproducible asset publishing.
+
 - Use `playwright-extra` for the browser runtime, retaining Playwright for browser installation and types.
 
 - Guide setup through concise progress steps and verify the installed MCP connection before declaring completion.

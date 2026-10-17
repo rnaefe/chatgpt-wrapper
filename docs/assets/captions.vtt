@@ -1,19 +1,22 @@
 WEBVTT
 
-00:00.000 --> 00:03.000
-ChatGPT Wrapper: a development-build onboarding preview using a saved session.
+00:00:00.000 --> 00:00:04.000
+ChatGPT through MCP. Send work from your coding client and get code, analysis and images back.
 
-00:03.000 --> 00:13.000
-Real CLI output: isolated Codex setup, Chromium ready, and seven MCP tools verified. Sign-in was deferred for this temporary installation.
+00:00:04.000 --> 00:00:10.000
+A local bridge connects your MCP client, a durable SQLite queue and your saved ChatGPT browser session.
 
-00:13.000 --> 00:18.000
-The existing ChatGPT session is connected. First sign-in requires a visible browser.
+00:00:10.000 --> 00:00:18.000
+Actual captured TypeScript output. This recorded run completed in 10.6 seconds; timing varies. Waiting is shortened.
 
-00:18.000 --> 00:30.000
-A live public TypeScript task completed in 10.6 seconds. The exact requested source was verified. This is a rendered terminal summary.
+00:00:18.000 --> 00:00:24.000
+An actual image generated through Wrapper. Image delivery includes a local file and chat display/download links.
 
-00:30.000 --> 00:34.000
-MCP client to local SQLite queue, ChatGPT, and back to a response. One browser task at a time; interrupted prompts are not replayed.
+00:00:24.000 --> 00:00:30.000
+Six development task types: code generation, code review, reasoning, image generation, image analysis and image editing. Provider UI availability varies.
 
-00:34.000 --> 00:38.000
-Install the released version with npx -y @rnaefe/chatgpt-wrapper@0.4.2. Requires Node.js 24+, a ChatGPT account, and restarting Codex after setup.
+00:00:30.000 --> 00:00:36.000
+Local fixture benchmark: median queue, validation and persistence improved from 244 to 1.7 milliseconds. Twelve samples; browser and provider time excluded.
+
+00:00:36.000 --> 00:00:40.000
+Build from source at github.com/rnaefe/chatgpt-wrapper. Requires Node.js 24 and your ChatGPT account. Sign-in and provider verification remain manual.

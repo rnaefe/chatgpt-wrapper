@@ -5,8 +5,10 @@
   "scripts": {
     "studio": "remotion studio src/Root.tsx",
     "render": "remotion render src/Root.tsx WrapperDemo out/demo.mp4 --concurrency=4",
-    "poster": "remotion still src/Root.tsx WrapperDemo out/poster.png --frame=210",
-    "capture": "node scripts/capture.mjs"
+    "poster": "remotion still src/Root.tsx WrapperDemo out/poster.png --frame=80",
+    "capture": "node scripts/capture.mjs",
+    "publish-assets": "node scripts/publish.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@remotion/cli": "4.0.536",
