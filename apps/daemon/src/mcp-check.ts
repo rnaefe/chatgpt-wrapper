@@ -30,6 +30,8 @@ export async function checkMcp(entry: McpCommand) {
     for (const name of [
       "submit_task",
       "get_task",
+      "wait_task",
+      "get_status",
       "list_tasks",
       "cancel_task",
       "get_artifact",

@@ -33,3 +33,53 @@ export function windowStart(hours: number) {
     throw new Error("Metrics window must be between 1 and 720 hours");
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 }
+
+export function summarizeMetrics(
+  rows: Array<Record<string, unknown>>,
+  since: string,
+  hours: number,
+) {
+  const outcomes: Record<string, number> = {};
+  const errors: Record<string, number> = Object.create(null);
+  const queue: number[] = [],
+    execution: number[] = [],
+    total: number[] = [];
+  for (const row of rows) {
+    const status = String(row.status);
+    outcomes[status] = (outcomes[status] ?? 0) + 1;
+    if (row.errorCode) {
+      const code = String(row.errorCode);
+      errors[code] = (errors[code] ?? 0) + 1;
+    }
+    const queueMs = elapsed(row.createdAt, row.startedAt);
+    if (queueMs !== undefined) queue.push(queueMs);
+    const executionMs = elapsed(row.startedAt, row.finishedAt);
+    if (executionMs !== undefined) execution.push(executionMs);
+    const totalMs = elapsed(row.createdAt, row.finishedAt);
+    if (totalMs !== undefined) total.push(totalMs);
+  }
+  const completed = outcomes.COMPLETED ?? 0;
+  const terminalNonCancelled = [
+    "COMPLETED",
+    "FAILED",
+    "NEEDS_AUTH",
+    "NEEDS_HUMAN",
+    "BLOCKED_BY_PROVIDER",
+  ].reduce((sum, status) => sum + (outcomes[status] ?? 0), 0);
+  return {
+    since,
+    windowHours: hours,
+    generatedAt: new Date().toISOString(),
+    tasks: rows.length,
+    outcomes,
+    completed,
+    terminalNonCancelled,
+    successRate: terminalNonCancelled ? completed / terminalNonCancelled : null,
+    duration: {
+      queue: durationSummary(queue),
+      execution: durationSummary(execution),
+      total: durationSummary(total),
+    },
+    errors,
+  };
+}

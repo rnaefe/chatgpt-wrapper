@@ -5,6 +5,8 @@ export const capabilitySchema = z.enum([
   "code.review",
   "reason.analyze",
   "image.generate",
+  "image.analyze",
+  "image.edit",
 ]);
 export const statusSchema = z.enum([
   "QUEUED",
@@ -38,15 +40,32 @@ const imageInputSchema = z.discriminatedUnion("source", [
       }),
   }),
 ]);
-export const taskRequestSchema = z.strictObject({
-  capability: capabilitySchema,
-  objective: z.string().trim().min(1).max(100_000),
-  acceptanceCriteria: z.array(z.string().max(2000)).max(30).default([]),
-  allowedPaths: z.array(z.string().max(500)).max(100).default([]),
-  images: z.array(imageInputSchema).max(8).default([]),
-  idempotencyKey: z.string().min(1).max(200).optional(),
-  timeoutSeconds: z.number().int().min(1).max(1800).default(300),
-});
+export const taskRequestSchema = z
+  .strictObject({
+    capability: capabilitySchema,
+    objective: z.string().trim().min(1).max(100_000),
+    acceptanceCriteria: z.array(z.string().max(2000)).max(30).default([]),
+    allowedPaths: z.array(z.string().max(500)).max(100).default([]),
+    images: z.array(imageInputSchema).max(8).default([]),
+    idempotencyKey: z.string().min(1).max(200).optional(),
+    timeoutSeconds: z.number().int().min(1).max(1800).default(300),
+  })
+  .superRefine((request, context) => {
+    if (
+      (request.capability === "image.edit" ||
+        request.capability === "image.analyze") &&
+      !request.images.length
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["images"],
+        message: "This capability requires at least one input image",
+      });
+  });
+
+export function producesImage(capability: string): boolean {
+  return capability === "image.generate" || capability === "image.edit";
+}
 export type TaskRequest = z.infer<typeof taskRequestSchema>;
 export type ImageInput = z.infer<typeof imageInputSchema>;
 export type Capability = z.infer<typeof capabilitySchema>;

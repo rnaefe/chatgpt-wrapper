@@ -1,4 +1,4 @@
-import { durationSummary, elapsed, windowStart } from "./metrics.js";
+import { summarizeMetrics, windowStart } from "./metrics.js";
 import { DatabaseSync } from "node:sqlite";
 import {
   chmodSync,
@@ -39,6 +39,24 @@ export class ConflictError extends Error {}
 
 export class Store {
   private readonly db: DatabaseSync;
+  private readonly listeners = new Set<(task: Task) => void>();
+
+  onTaskChange(listener: (task: Task) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify(task: Task) {
+    for (const listener of this.listeners) {
+      try {
+        listener(task);
+      } catch {
+        console.error("Task change listener failed");
+      }
+    }
+  }
 
   constructor(readonly directory: string) {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -51,7 +69,8 @@ export class Store {
       CREATE INDEX IF NOT EXISTS tasks_status ON tasks(status, created);
       CREATE INDEX IF NOT EXISTS tasks_created ON tasks(created);
       CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL, body TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, body TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, body TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS events_task ON events(task_id, seq);`);
   }
   get(id: string): Task | undefined {
     const row = this.db.prepare("SELECT body FROM tasks WHERE id=?").get(id);
@@ -118,6 +137,7 @@ export class Store {
         );
       this.recordEvent(task, "Submitted");
       this.db.exec("COMMIT");
+      this.notify(task);
       return { task, reused: false };
     } catch (e) {
       this.db.exec("ROLLBACK");
@@ -171,6 +191,7 @@ export class Store {
       this.db.exec("ROLLBACK");
       throw e;
     }
+    this.notify(updated);
     return updated;
   }
   next(): Task | undefined {
@@ -247,51 +268,7 @@ export class Store {
         `SELECT status, json_extract(body,'$.createdAt') AS createdAt, json_extract(body,'$.startedAt') AS startedAt, json_extract(body,'$.finishedAt') AS finishedAt, json_extract(body,'$.error.code') AS errorCode FROM tasks WHERE created >= ?`,
       )
       .all(since);
-    const outcomes: Record<string, number> = {};
-    const errors: Record<string, number> = Object.create(null);
-    const queue: number[] = [],
-      execution: number[] = [],
-      total: number[] = [];
-    for (const row of rows) {
-      const status = String(row.status);
-      outcomes[status] = (outcomes[status] ?? 0) + 1;
-      if (row.errorCode) {
-        const code = String(row.errorCode);
-        errors[code] = (errors[code] ?? 0) + 1;
-      }
-      const queueMs = elapsed(row.createdAt, row.startedAt);
-      if (queueMs !== undefined) queue.push(queueMs);
-      const executionMs = elapsed(row.startedAt, row.finishedAt);
-      if (executionMs !== undefined) execution.push(executionMs);
-      const totalMs = elapsed(row.createdAt, row.finishedAt);
-      if (totalMs !== undefined) total.push(totalMs);
-    }
-    const completed = outcomes.COMPLETED ?? 0;
-    const terminalNonCancelled = [
-      "COMPLETED",
-      "FAILED",
-      "NEEDS_AUTH",
-      "NEEDS_HUMAN",
-      "BLOCKED_BY_PROVIDER",
-    ].reduce((sum, status) => sum + (outcomes[status] ?? 0), 0);
-    return {
-      since,
-      windowHours: hours,
-      generatedAt: new Date().toISOString(),
-      tasks: rows.length,
-      outcomes,
-      completed,
-      terminalNonCancelled,
-      successRate: terminalNonCancelled
-        ? completed / terminalNonCancelled
-        : null,
-      duration: {
-        queue: durationSummary(queue),
-        execution: durationSummary(execution),
-        total: durationSummary(total),
-      },
-      errors,
-    };
+    return summarizeMetrics(rows, since, hours);
   }
   failures(limit = 20, hours = 24) {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100)
@@ -370,6 +347,7 @@ export class Store {
   }
 
   close() {
+    this.listeners.clear();
     this.db.close();
   }
 }

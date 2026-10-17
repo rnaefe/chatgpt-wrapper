@@ -160,6 +160,12 @@ try {
   const names = (await client.listTools()).tools.map((tool) => tool.name);
   assert(names.includes("submit_task"));
   assert(names.includes("get_task"));
+  assert(names.includes("wait_task"));
+  assert(names.includes("get_status"));
+  const status = await client.callTool({ name: "get_status", arguments: {} });
+  const capabilities = JSON.parse(status.content[0].text).provider.capabilities;
+  assert(capabilities.includes("image.edit"));
+  assert(capabilities.includes("image.analyze"));
   assert(names.includes("get_metrics"));
   assert(names.includes("list_errors"));
   const metrics = await client.callTool({

@@ -95,32 +95,115 @@ describe("ChatGPT page engine (DOM fixtures)", () => {
       { src: "https://cdn.example/image.png", mime: "image/png" },
     ]);
   });
-  it("completes image generation when the response has no text or copy control", async () => {
+  it.each(["image.generate", "image.edit"])(
+    "completes %s when the response has no text or copy control",
+    async (capability) => {
+      const doc = page();
+      const imageRequest = taskRequestSchema.parse({
+        capability,
+        images:
+          capability === "image.edit"
+            ? [
+                {
+                  source: "base64",
+                  data: "AP8=",
+                  mime: "image/png",
+                  name: "reference.png",
+                },
+              ]
+            : [],
+        objective: "Create a cabin illustration",
+      });
+      doc.querySelector("button")!.addEventListener("click", () => {
+        accept(doc, imageRequest);
+        addTurn(
+          doc,
+          "assistant",
+          '<div><img src="https://cdn.example/generated.png" type="image/png"></div>',
+        );
+      });
+
+      const result = await executeInPage(
+        doc,
+        imageRequest,
+        new AbortController().signal,
+        short,
+      );
+
+      expect(result.text).toBe("");
+      expect(result.images).toEqual([
+        { src: "https://cdn.example/generated.png", mime: "image/png" },
+      ]);
+    },
+  );
+  it("does not mistake an uploaded reference for an edited output", async () => {
+    const doc = page();
+    const edit = taskRequestSchema.parse({
+      capability: "image.edit",
+      objective: "Make the sky blue",
+      images: [
+        {
+          source: "base64",
+          data: "AP8=",
+          mime: "image/png",
+          name: "reference.png",
+        },
+      ],
+    });
+    doc.querySelector("button")!.addEventListener("click", () => {
+      accept(doc, edit);
+      const reference = doc.createElement("img");
+      reference.src = "https://cdn.example/reference.png";
+      doc.querySelector("article")!.append(reference);
+      setTimeout(
+        () =>
+          addTurn(
+            doc,
+            "assistant",
+            '<img src="https://cdn.example/edited.png">',
+          ),
+        90,
+      );
+    });
+    const result = await executeInPage(
+      doc,
+      edit,
+      new AbortController().signal,
+      short,
+    );
+    expect(result.images).toEqual([
+      { src: "https://cdn.example/edited.png", mime: undefined },
+    ]);
+  });
+  it("waits for streaming to stop before returning a generated image", async () => {
     const doc = page();
     const imageRequest = taskRequestSchema.parse({
       capability: "image.generate",
-      objective: "Create a cabin illustration",
+      objective: "Create a lake",
     });
     doc.querySelector("button")!.addEventListener("click", () => {
       accept(doc, imageRequest);
-      addTurn(
+      const turn = addTurn(
         doc,
         "assistant",
-        '<div><img src="https://cdn.example/generated.png" type="image/png"></div>',
+        '<img src="https://cdn.example/preview.png">',
       );
+      const stop = doc.createElement("button");
+      stop.dataset.testid = "stop-button";
+      doc.body.append(stop);
+      setTimeout(() => {
+        turn.content.querySelector("img")!.src =
+          "https://cdn.example/final.png";
+        stop.remove();
+      }, 90);
     });
-
     const result = await executeInPage(
       doc,
       imageRequest,
       new AbortController().signal,
       short,
     );
-
-    expect(result.text).toBe("");
-    expect(result.images).toEqual([
-      { src: "https://cdn.example/generated.png", mime: "image/png" },
-    ]);
+    expect(result.images[0].src).toBe("https://cdn.example/final.png");
   });
   it("finds an image rendered outside the assistant turn wrapper", async () => {
     const doc = page();

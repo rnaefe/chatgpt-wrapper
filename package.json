@@ -54,6 +54,7 @@
     "docs/OBSERVABILITY.md",
     "docs/SECURITY.md",
     "docs/MCP.md",
+    "docs/PERFORMANCE.md",
     "docs/TROUBLESHOOTING.md"
   ],
   "publishConfig": {

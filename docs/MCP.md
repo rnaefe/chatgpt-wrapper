@@ -15,13 +15,19 @@ Call `submit_task`:
 }
 ```
 
-The response contains a task `id`. Call `get_task` with that ID while its state is `QUEUED`, `RUNNING` or `VALIDATING`. Wait between polls. A `COMPLETED` response includes `result.text`, artifact IDs, provenance and validation results.
+The response contains a task `id`. Call `wait_task` with that ID to wait for completion for up to 30 seconds without polling. It returns immediately for terminal tasks. On timeout it returns the current state; if still `QUEUED`, `RUNNING` or `VALIDATING`, call it again. `waitMs: 0` takes an immediate snapshot. `get_task` remains available for a snapshot with event history. A `COMPLETED` response includes `result.text`, artifact IDs, provenance and validation results.
+
+Call `get_status` to inspect provider readiness, supported capabilities, browser state and queue counts without opening the browser.
 
 ```json
 { "id": "<task UUID returned by submit_task>" }
 ```
 
-`get_artifact` accepts an artifact's SHA-256 ID, not the task UUID. Text artifacts return text; images use MCP image content. MCP delivery is limited to 10 MiB per artifact. Larger artifacts require authenticated local HTTP retrieval.
+`get_artifact` accepts an artifact's SHA-256 ID, not the task UUID. Text artifacts return text. Images return MCP image content plus a JSON text block containing `localPath`, `displayMarkdown`, and `downloadMarkdown`. Put both Markdown values directly in the final chat reply: some clients show image tool output only to the agent, so a text acknowledgement alone does not deliver the image to the user.
+
+PNG, JPEG, WebP, GIF and AVIF images are automatically saved with a proper extension under `<DATA_DIR>/image-exports/`. Files use content-addressed names and private permissions. Repeated retrieval reuses the same filename. Exports remain until manually removed, independently of artifact retention. Paths refer to the MCP server host; remote clients must transfer the file to their own accessible workspace before embedding it.
+
+Inline MCP delivery is limited to 10 MiB per artifact. Larger supported images still get a local file and Markdown links, without a base64 image block. If saving fails, inline delivery remains available for images within the limit and the text block reports `IMAGE_EXPORT_FAILED`. Unsupported image export formats retain inline delivery when within the limit; otherwise use authenticated local HTTP retrieval.
 
 ## Handle terminal states
 
@@ -38,7 +44,20 @@ These states are terminal. Signing in does not replay an interrupted task. Do no
 
 ## Request boundaries
 
-Capabilities are `code.generate`, `code.review`, `reason.analyze` and `image.generate`. The default deadline is 300 seconds; valid deadlines are 1–1800 seconds. Code generation must return a nonempty fenced code block or unified diff. Validation does not establish correctness or satisfy acceptance criteria on behalf of a reviewer.
+Capabilities are:
+
+| Capability       | Result                              | Input images          |
+| ---------------- | ----------------------------------- | --------------------- |
+| `code.generate`  | Code or diff                        | Optional              |
+| `code.review`    | Review text                         | Optional              |
+| `reason.analyze` | Analysis text                       | Optional              |
+| `image.generate` | Generated image                     | Optional references   |
+| `image.analyze`  | Description, OCR or comparison text | At least one required |
+| `image.edit`     | Edited image                        | At least one required |
+
+Image editing requires an actual output image; a prose description alone fails validation. Image analysis requires nonempty text. These capabilities use the same saved provider session and remain dependent on the controls and features available in that account.
+
+The default deadline is 300 seconds; valid deadlines are 1–1800 seconds. Code generation must return a nonempty fenced code block or unified diff. Validation does not establish correctness or satisfy acceptance criteria on behalf of a reviewer.
 
 `allowedPaths` restricts paths in returned unified diffs. It does not give Wrapper filesystem access, read source files, or apply a patch. Include only the source you intend to send in the objective.
 
@@ -46,7 +65,17 @@ An optional `idempotencyKey` deduplicates an identical request. Reusing it with 
 
 ## Images
 
-Local image inputs require `IMAGE_INPUT_ROOTS`; URL inputs require exact HTTPS hosts in `ALLOWED_IMAGE_HOSTS`. See [security boundaries](SECURITY.md). Image generation and extraction depend on controls exposed by the provider UI and were not covered by the live code probes.
+Local image inputs require `IMAGE_INPUT_ROOTS`; URL inputs require exact HTTPS hosts in `ALLOWED_IMAGE_HOSTS`. See [security boundaries](SECURITY.md). Image generation and extraction depend on controls exposed by the provider UI. For example, submit an edit with an explicitly allowed local reference:
+
+```json
+{
+  "capability": "image.edit",
+  "objective": "Change the sky to sunset colors; preserve the subject and composition.",
+  "images": [{ "source": "path", "path": "/absolute/allowed/reference.png" }]
+}
+```
+
+Use `image.analyze` with the same input shape for OCR, visual descriptions or comparisons. Schema, worker and browser fixtures cover these flows; they do not establish live provider quality or availability.
 
 ## Diagnose a failure
 

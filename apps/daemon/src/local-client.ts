@@ -96,7 +96,7 @@ export async function localClient() {
     throw new Error(
       `The running daemon uses a different data directory. Stop it or select another PORT. Expected token in ${directory}.`,
     );
-  return async (path: string, body?: unknown) => {
+  return async (path: string, body?: unknown, timeoutMs = 10_000) => {
     const response = await fetch(new URL(path, base), {
       method: body === undefined ? "GET" : "POST",
       headers: {
@@ -104,7 +104,7 @@ export async function localClient() {
         "Content-Type": "application/json",
       },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(timeoutMs),
       redirect: "error",
     });
     if (!response.ok)

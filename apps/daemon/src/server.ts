@@ -1,3 +1,4 @@
+import { waitForTask } from "./task-wait.js";
 import { packageMetadata } from "./runtime-paths.js";
 import { PlaywrightAdapter } from "./playwright-adapter.js";
 import Fastify from "fastify";
@@ -14,9 +15,14 @@ export function createServer(options: {
   logger?: boolean;
 }) {
   const { store, worker, token } = options;
+  const waitingClients = new Set<AbortController>();
   const server = Fastify({
     logger: options.logger ?? false,
     bodyLimit: 29 * 1024 * 1024,
+  });
+  server.addHook("preClose", async () => {
+    for (const controller of waitingClients) controller.abort();
+    waitingClients.clear();
   });
   server.addHook("onRequest", async (req, reply) => {
     const expected = new Set([
@@ -169,6 +175,37 @@ export function createServer(options: {
       return task
         ? { ...task, events: store.events(task.id) }
         : reply.code(404).send({ error: "TASK_NOT_FOUND" });
+    },
+  );
+  server.get<{ Params: { id: string } }>(
+    "/v1/tasks/:id/wait",
+    async (req, reply) => {
+      const id = z.string().uuid().safeParse(req.params.id);
+      const query = z
+        .object({
+          waitMs: z.coerce.number().int().min(0).max(30_000).default(30_000),
+        })
+        .safeParse(req.query);
+      if (!id.success || !query.success)
+        return reply.code(400).send({ error: "INVALID_WAIT_REQUEST" });
+      const controller = new AbortController();
+      waitingClients.add(controller);
+      const disconnect = () => controller.abort();
+      reply.raw.once("close", disconnect);
+      try {
+        const task = await waitForTask(
+          store,
+          id.data,
+          query.data.waitMs,
+          controller.signal,
+        );
+        return task
+          ? { ...task, events: store.events(task.id) }
+          : reply.code(404).send({ error: "TASK_NOT_FOUND" });
+      } finally {
+        waitingClients.delete(controller);
+        reply.raw.removeListener("close", disconnect);
+      }
     },
   );
   server.post<{ Params: { id: string } }>(

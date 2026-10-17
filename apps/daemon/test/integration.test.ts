@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { Store, ConflictError } from "@chatgpt-wrapper/core";
@@ -155,7 +155,7 @@ describe("durable queue", () => {
     expect(store.get(queued.id)?.status).toBe("QUEUED");
     expect(() => store.artifactData(artifact.id)).toThrow("Artifact not found");
   });
-  it("rejects unsupported image capabilities", () => {
+  it("rejects image editing without a reference", () => {
     expect(
       taskRequestSchema.safeParse({
         capability: "image.edit",
@@ -166,6 +166,117 @@ describe("durable queue", () => {
 });
 
 describe("HTTP and worker", () => {
+  it.each(["image.generate", "image.edit"])(
+    "stores %s without an empty text artifact",
+    async (capability) => {
+      const f = fixture({
+        ...success,
+        execute: async () => ({
+          text: "",
+          adapter: "test",
+          model: "fixture",
+          images: [
+            {
+              data: Buffer.from([137, 80, 78, 71]),
+              mime: "image/png",
+              source: "fixture",
+            },
+          ],
+        }),
+      });
+      const task = f.store.submit(
+        request({
+          capability,
+          images:
+            capability === "image.edit"
+              ? [
+                  {
+                    source: "base64",
+                    data: "AP8=",
+                    mime: "image/png",
+                    name: "reference.png",
+                  },
+                ]
+              : [],
+        }),
+      ).task;
+      await f.worker.tick();
+      const done = f.store.get(task.id)!;
+      expect(done.status).toBe("COMPLETED");
+      expect(done.result!.artifacts).toHaveLength(1);
+      expect(done.result!.artifacts[0].kind).toBe("image");
+    },
+  );
+  it("returns text for image analysis and requires output images for editing", async () => {
+    const f = fixture(success);
+    const images = [
+      {
+        source: "base64",
+        data: "AP8=",
+        mime: "image/png",
+        name: "reference.png",
+      },
+    ];
+    const analyze = f.store.submit(
+      request({ capability: "image.analyze", images }),
+    ).task;
+    await f.worker.tick();
+    expect(f.store.get(analyze.id)?.status).toBe("COMPLETED");
+    const edit = f.store.submit(
+      request({ capability: "image.edit", images }),
+    ).task;
+    await f.worker.tick();
+    expect(f.store.get(edit.id)).toMatchObject({
+      status: "FAILED",
+      error: { code: "VALIDATION_FAILED" },
+    });
+  });
+  it("releases pending HTTP waits before shutting down", async () => {
+    const f = fixture(success);
+    const server = http(f);
+    const task = f.store.submit(request()).task;
+    const subscribe = f.store.onTaskChange.bind(f.store);
+    let registered!: () => void;
+    const listening = new Promise<void>((resolve) => {
+      registered = resolve;
+    });
+    vi.spyOn(f.store, "onTaskChange").mockImplementation((listener) => {
+      const unsubscribe = subscribe(listener);
+      registered();
+      return unsubscribe;
+    });
+    const pending = server
+      .inject({ url: `/v1/tasks/${task.id}/wait?waitMs=30000`, headers: auth })
+      .then((response) => response);
+    await listening;
+    await server.close();
+    expect((await pending).json().status).toBe("QUEUED");
+  });
+  it("validates HTTP waits and returns missing tasks promptly", async () => {
+    const server = http(fixture());
+    const id = "12345678-1234-4234-8234-123456789012";
+    expect(
+      (
+        await server.inject({
+          url: `/v1/tasks/${id}/wait?waitMs=0`,
+          headers: auth,
+        })
+      ).statusCode,
+    ).toBe(404);
+    expect(
+      (
+        await server.inject({
+          url: `/v1/tasks/${id}/wait?waitMs=30001`,
+          headers: auth,
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (await server.inject({ url: `/v1/tasks/${id}/wait?waitMs=0` }))
+        .statusCode,
+    ).toBe(401);
+  });
+
   it("requires auth and rejects hostile origins and hosts", async () => {
     const server = http(fixture());
     await server.listen({ port: 0, host: "127.0.0.1" });
@@ -360,6 +471,8 @@ describe("MCP protocol", () => {
         "cancel_task",
         "list_tasks",
         "get_artifact",
+        "wait_task",
+        "get_status",
       ]),
     );
     const submitted = await client.callTool({
@@ -373,7 +486,15 @@ describe("MCP protocol", () => {
       (submitted.content as Array<{ text: string }>)[0].text,
     );
     expect(f.store.get(task.id)?.status).toBe("QUEUED");
+    const waiting = client.callTool({
+      name: "wait_task",
+      arguments: { id: task.id, waitMs: 1000 },
+    });
     await f.worker.tick();
+    expect(
+      JSON.parse(((await waiting).content as Array<{ text: string }>)[0].text)
+        .status,
+    ).toBe("COMPLETED");
     const result = await client.callTool({
       name: "get_task",
       arguments: { id: task.id },
@@ -382,6 +503,19 @@ describe("MCP protocol", () => {
       (result.content as Array<{ text: string }>)[0].text,
     );
     expect(done.status).toBe("COMPLETED");
+    const waited = await client.callTool({
+      name: "wait_task",
+      arguments: { id: task.id },
+    });
+    expect(
+      JSON.parse((waited.content as Array<{ text: string }>)[0].text).status,
+    ).toBe("COMPLETED");
+    const status = await client.callTool({ name: "get_status", arguments: {} });
+    expect(
+      JSON.parse((status.content as Array<{ text: string }>)[0].text).counts
+        .COMPLETED,
+    ).toBe(1);
+
     const artifact = await client.callTool({
       name: "get_artifact",
       arguments: { id: done.result.artifacts[0].id },
@@ -406,6 +540,7 @@ describe("MCP protocol", () => {
         ),
         WRAPPER_URL: `http://127.0.0.1:${server.addresses()[0].port}`,
         LOCAL_API_TOKEN: token,
+        DATA_DIR: f.directory,
       },
       stderr: "pipe",
     });
@@ -420,6 +555,15 @@ describe("MCP protocol", () => {
     });
     expect(result.content).toEqual([
       { type: "image", data: bytes.toString("base64"), mimeType: "image/png" },
+      { type: "text", text: expect.any(String) },
     ]);
+    const delivery = JSON.parse(
+      (result.content as Array<{ text: string }>)[1].text,
+    );
+    expect(delivery.localPath).toBe(
+      join(f.directory, "image-exports", `${image.id}.png`),
+    );
+    expect(readFileSync(delivery.localPath)).toEqual(bytes);
+    expect(delivery.displayMarkdown).toContain(delivery.localPath);
   });
 });

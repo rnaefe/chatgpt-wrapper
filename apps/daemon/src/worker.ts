@@ -12,6 +12,17 @@ export class Worker {
   private stopping = false;
   private timer?: ReturnType<typeof setInterval>;
   private lastRetentionSweep = 0;
+  private unsubscribe?: () => void;
+  private scheduled = false;
+
+  private wake() {
+    if (this.scheduled || this.stopping || !this.timer) return;
+    this.scheduled = true;
+    queueMicrotask(() => {
+      this.scheduled = false;
+      void this.runTick();
+    });
+  }
 
   constructor(
     private readonly store: Store,
@@ -22,7 +33,11 @@ export class Worker {
   start() {
     if (this.timer) return;
     this.store.recover();
-    this.timer = setInterval(() => void this.runTick(), 250);
+    // The fallback handles readiness changes after sign-in; submissions wake immediately.
+    this.timer = setInterval(() => void this.runTick(), 1000);
+    this.unsubscribe = this.store.onTaskChange((task) => {
+      if (task.status === "QUEUED") this.wake();
+    });
     void this.runTick();
   }
 
@@ -64,6 +79,7 @@ export class Worker {
       await done;
     } finally {
       this.active = undefined;
+      this.wake();
     }
   }
   cancel(id: string) {
@@ -99,12 +115,16 @@ export class Worker {
       const checks = validateText(output.text, task.request);
       const imageChecks = validateImages(output.images ?? [], task.request);
       const artifacts = [
-        this.store.putArtifact(
-          Buffer.from(output.text),
-          "text/plain",
-          `${output.adapter}:${output.model}`,
-          "text",
-        ),
+        ...(output.text.trim()
+          ? [
+              this.store.putArtifact(
+                Buffer.from(output.text),
+                "text/plain",
+                `${output.adapter}:${output.model}`,
+                "text",
+              ),
+            ]
+          : []),
         ...(output.images ?? []).map((image) =>
           this.store.putArtifact(image.data, image.mime, image.source, "image"),
         ),
@@ -157,6 +177,8 @@ export class Worker {
   async stop() {
     if (this.stopping) return;
     this.stopping = true;
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = undefined;

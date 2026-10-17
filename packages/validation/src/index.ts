@@ -1,7 +1,7 @@
-import type { TaskRequest } from "@chatgpt-wrapper/contracts";
+import { producesImage, type TaskRequest } from "@chatgpt-wrapper/contracts";
 export const MAX_ARTIFACT_BYTES = 20 * 1024 * 1024;
 export function validateText(text: string, request: TaskRequest): string[] {
-  if (!text.trim() && request.capability !== "image.generate")
+  if (!text.trim() && !producesImage(request.capability))
     throw new Error("Provider returned an empty response");
   if (request.capability === "code.generate") {
     const code = text.match(/^(`{3,}|~{3,})[^\n]*\n([\s\S]*?)\n\1[ \t]*$/m);
@@ -50,7 +50,7 @@ export function validateImages(
   images: Array<{ data: Buffer; mime: string }>,
   request: TaskRequest,
 ): string[] {
-  if (request.capability === "image.generate" && images.length === 0)
+  if (producesImage(request.capability) && images.length === 0)
     throw new Error("Provider did not return a generated image");
   return images.length ? ["generated images captured"] : [];
 }
