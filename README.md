@@ -1,119 +1,110 @@
 # ChatGPT Wrapper
 
-Use your ChatGPT browser session from an MCP coding client. Wrapper queues a task, runs it in ChatGPT, and returns the response with code blocks intact.
+**I ran out of Codex usage, so I literally wrapped ChatGPT.**
 
-[Install](docs/INSTALLATION.md) · [npm](https://www.npmjs.com/package/@rnaefe/chatgpt-wrapper) · [Releases](https://github.com/rnaefe/chatgpt-wrapper/releases) · [Contribute](CONTRIBUTING.md)
+Connect your own ChatGPT browser session to coding agents using **MCP**. Wrapper runs locally, sends tasks through a real Chromium browser, and returns text, code, and image artifacts to your client.
 
-[![Watch the product demo with music](docs/assets/wrapper-demo.png)](docs/assets/wrapper-demo.mp4)
+**[Watch the 40-second demo](docs/assets/wrapper-demo.mp4)** · **[Install](#quick-start)** · [npm](https://www.npmjs.com/package/@rnaefe/chatgpt-wrapper) · [Documentation](#documentation)
 
-**[Watch the 40-second demo with music](docs/assets/wrapper-demo.mp4)** · [Captions](docs/assets/captions.vtt) · [Video source](video/README.md)
+[![A short animated preview of ChatGPT Wrapper](docs/assets/wrapper-demo.gif)](docs/assets/wrapper-demo.mp4)
 
-A 1080p product film with an original electronic score, actual captured code output, a Wrapper-generated image and a local queue benchmark. Designed scenes show the development workflow; this is an edited presentation, not an uncut screen recording. [Evidence and rendering details](video/README.md).
+*The demo is an edited product presentation using captured results; it isn't an uncut recording. No API key is required, but you must sign in with your own ChatGPT account.*
 
-<details>
-<summary>Play the animated preview</summary>
+## Quick start
 
-![Four-second animated preview of the Wrapper product film](docs/assets/wrapper-demo.gif)
+**Requirements:** Node.js 24+, npm, a desktop environment, and a ChatGPT account. The full setup and live coding workflow have been verified on **macOS**; Windows and Linux still need broader testing.
 
-</details>
+**1. Install and connect to Codex**
 
-An unofficial, experimental project. Requires your own ChatGPT account; no OpenAI API key. Provider UI changes, verification prompts and account limits can interrupt tasks.
-
-## Start with Codex
-
-Requires **Node.js 24+**, npm and a desktop session.
-
-```sh
+```bash
 npx -y @rnaefe/chatgpt-wrapper@0.4.2
 ```
 
-1. Setup installs Chromium and adds Wrapper to your Codex configuration, with a backup.
-2. Sign in to ChatGPT in the window that opens. Wrapper detects the session and closes the window.
-3. Restart Codex, then ask it to use Wrapper for a task.
+The installer downloads Chromium, configures the Wrapper MCP server in Codex, and backs up any existing configuration before making changes. No clone or manual MCP config editing needed.
 
-For example:
+**2. Sign in once**
 
-> Use Wrapper to generate a TypeScript LRU cache with a usage example. Use wait_task until it finishes, then show me the result.
+Complete the ChatGPT sign-in in the browser window. Wrapper keeps the session in a separate local profile. Browser verification, if requested, must be completed manually.
 
-The browser opens while each task runs and closes afterwards. Your saved session is reused. Generated code is returned for review; Wrapper does not execute commands or modify your repository.
+**3. Restart Codex and try a task**
 
-For another client, run `setup --client cursor` or `setup --client claude-desktop`. For custom paths, existing installations and removal, see the [installation guide](docs/INSTALLATION.md).
+> Use the Wrapper MCP server to generate a TypeScript LRU cache with a short usage example. Check the task until it completes, then show me the result.
 
-## Everyday commands
+Your coding agent sends the task via MCP; Wrapper returns the result for review. It does **not** run generated code or change your project files.
 
-```sh
-# Update the managed installation, then restart your MCP client
-npx -y @rnaefe/chatgpt-wrapper@latest update
+**Using a different client?**
 
-# Reconnect if ChatGPT asks you to sign in again
-npx -y @rnaefe/chatgpt-wrapper@latest connect
-
-# Inspect the installation without opening a browser
-npx -y @rnaefe/chatgpt-wrapper@latest doctor
-
-# Remove Wrapper from Codex, preserving saved data
-npx -y @rnaefe/chatgpt-wrapper@latest uninstall
+```bash
+npx -y @rnaefe/chatgpt-wrapper@0.4.2 setup --client cursor
+npx -y @rnaefe/chatgpt-wrapper@0.4.2 setup --client claude-desktop
 ```
 
-Update and uninstall recognize managed settings from the selected client. Other client entries are preserved. User profiles, history and logs remain on disk after uninstall; [removal details](docs/INSTALLATION.md#updating-and-removing) explain how to erase them deliberately.
+These commands configure the selected MCP client; support for its configuration format doesn't imply every OS and browser combination has been tested. See [installation and custom paths](docs/INSTALLATION.md).
 
-## How it works
+## What it does
+
+- **MCP interface:** submit coding or analysis tasks, inspect their status, cancel work, and retrieve results.
+- **Durable task queue:** SQLite stores tasks and artifacts; interrupted browser work isn't silently submitted twice.
+- **Browser session management:** Playwright opens your saved ChatGPT session for work and closes the window afterward.
+- **Developer tooling:** a CLI for setup, reconnecting, updates and uninstall, plus local task diagnostics.
 
 ```mermaid
 flowchart LR
-  Client[MCP client] --> MCP[Local stdio server]
-  MCP --> Queue[SQLite task queue]
-  Queue --> Browser[ChatGPT browser session]
-  Browser --> Result[Validated response and artifacts]
-  Result --> Client
+  A[Coding agent] --> B[MCP server]
+  B --> C[Local SQLite queue]
+  C --> D[Playwright worker]
+  D --> E[Your ChatGPT session]
+  E --> F[Result and artifacts]
+  F --> A
 ```
 
-One worker processes one task at a time. Clients share the authenticated loopback worker and queue. Tasks persist across restarts, but interrupted submissions are never replayed automatically.
+Wrapper is a **task bridge**, not another autonomous coding agent. Your MCP client handles planning, source files, applying changes, and reviewing generated output.
 
-| MCP tool       | Purpose                                        |
-| -------------- | ---------------------------------------------- |
-| `submit_task`  | Queue a coding, review, analysis or image task |
-| `get_task`     | Read status, response and event history        |
-| `wait_task`    | Await completion for up to 30 seconds          |
-| `get_status`   | Inspect readiness, capabilities and queue      |
-| `list_tasks`   | Browse tasks, with optional status filtering   |
-| `cancel_task`  | Cancel queued or running work                  |
-| `get_artifact` | Read a stored text or image result             |
-| `get_metrics`  | Inspect success rates and task durations       |
-| `list_errors`  | Inspect recent task IDs and error codes        |
+The published **v0.4.2** package focuses on code generation, code review, reasoning, and image generation. Additional features in the development source may not yet be in the npm release. See [MCP usage](docs/MCP.md) for task schemas and [releases](https://github.com/rnaefe/chatgpt-wrapper/releases) for shipped versions.
 
-Tasks support code generation, code review, reasoning, image generation, image analysis and image editing. Analysis and editing require input images. Image results include local files and Markdown links for chat delivery.
+## Useful commands
 
-See the [MCP usage guide](docs/MCP.md) for request examples and status handling. Local queue measurements and their limits are documented in [performance](docs/PERFORMANCE.md).
+```bash
+# Check your installation without starting a browser
+npx -y @rnaefe/chatgpt-wrapper@latest doctor
 
-## Development improvements
+# Reconnect your saved session if login is needed
+npx -y @rnaefe/chatgpt-wrapper@latest connect
 
-The working source adds image analysis/editing, long-poll task waiting, chat-ready image exports and task-specific prompt contracts. Prompts preserve objectives and constraints in JSON, request the appropriate deliverable for each capability, and distinguish evidence from assumptions. Prompt wording is not a security boundary or a substitute for reviewing results.
+# Upgrade a managed installation
+npx -y @rnaefe/chatgpt-wrapper@latest update
 
-## What is verified
-
-On macOS, the 0.4.2 release passed 76 tests, a clean npm installation, Codex config preservation, a seven-tool MCP handshake, update and uninstall checks. Two live visible coding probes completed in 10.0 and 11.0 seconds. These are individual test results, not an uptime guarantee.
-
-**Visible mode is the default.** Experimental headless mode encountered ChatGPT browser verification in the recorded test. Initial sign-in and verification remain manual. There is no challenge bypass or automatic prompt retry. Windows/Linux acceptance and long-session reliability remain unverified; image tasks were not part of the live coding checks. See [browser reliability](docs/BROWSER_RELIABILITY.md) for the evidence and repeatable checks.
-
-## Data and configuration
-
-No `.env` is needed for installation. Packaged installs use the OS application-data directory; repository development uses `.data`. The separate `playwright-profile` contains the saved ChatGPT session. Never share it, bearer tokens or task databases.
-
-Terminal tasks and unreferenced artifacts expire after 30 days by default (`TASK_RETENTION_DAYS=0` disables expiry). Browser credentials and logs are retained until removed. Image file paths and HTTPS downloads require explicit allowlists. Prompts and results are sent to ChatGPT; metrics stay local.
-
-Read [security and privacy](docs/SECURITY.md), [configuration](docs/INSTALLATION.md) and [observability](docs/OBSERVABILITY.md).
-
-## Contribute
-
-```sh
-pnpm install --frozen-lockfile
-pnpm browser:install
-pnpm check
+# Remove Wrapper from the selected MCP client's config
+npx -y @rnaefe/chatgpt-wrapper@latest uninstall
 ```
 
-Tests use local fixtures and do not require a ChatGPT account. Real provider checks are separate and explicitly invoked. See [CONTRIBUTING.md](CONTRIBUTING.md) for the package map, focused test commands and release checks. No CI workflow is included.
+Uninstall preserves your local profile and task data so other installed clients are not unexpectedly broken. To remove your data, follow the [complete removal instructions](docs/INSTALLATION.md#updating-and-removing).
 
-[Report a bug](https://github.com/rnaefe/chatgpt-wrapper/issues/new/choose) · [Report a vulnerability privately](https://github.com/rnaefe/chatgpt-wrapper/security/advisories/new) · [Roadmap](docs/ROADMAP.md)
+## Good to know
 
-Licensed under [GNU GPL v3](LICENSE).
+| Question | Answer |
+| --- | --- |
+| **Is this an official OpenAI integration?** | No. This is an independent experimental project that automates the ChatGPT web interface, not an official API. |
+| **Does it bypass account limits or verification?** | No. Your normal account limits apply; login and browser challenges require you. |
+| **Will it work headlessly?** | Headless mode is experimental and has encountered browser verification. Visible mode is the default. |
+| **Is it reliable on Windows/Linux?** | Client configuration is supported in documented environments, but equivalent live end-to-end acceptance hasn't been completed. |
+| **Where is my data?** | Your profile, task history and local diagnostics stay on your machine. Task prompts and uploaded content are sent to ChatGPT. |
+| **Will it edit my repository?** | No. It returns results to the MCP client, which decides what to do with them. |
+
+**Security:** Treat the saved browser profile and local tokens as credentials. Do not publish them, and only submit data you are authorized to share. Review the provider's applicable terms. [Security and privacy](docs/SECURITY.md) · [Known browser limitations](docs/BROWSER_RELIABILITY.md).
+
+## Documentation
+
+- [Install, configure, update or uninstall](docs/INSTALLATION.md)
+- [Use the MCP tools](docs/MCP.md)
+- [Troubleshoot authentication and browser tasks](docs/TROUBLESHOOTING.md)
+- [Architecture and design decisions](docs/ARCHITECTURE.md)
+- [Contributing](CONTRIBUTING.md)
+
+## Contributing
+
+Issues, bug reports and small pull requests are welcome. If a provider UI change breaks a task, please share a minimal reproduction **without** private prompts, screenshots of your account, browser profiles or credentials.
+
+[Open an issue](https://github.com/rnaefe/chatgpt-wrapper/issues/new/choose) · [Contribute](CONTRIBUTING.md) · [Report a security issue privately](https://github.com/rnaefe/chatgpt-wrapper/security/advisories/new)
+
+Licensed under **[GPL-3.0](LICENSE)**.

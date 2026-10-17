@@ -153,3 +153,6 @@ vite.config.ts.timestamp-*
 
 # macOS metadata
 .DS_Store
+
+# Private/demo production workspace; only exported demo assets are public.
+/video/

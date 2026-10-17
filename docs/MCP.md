@@ -1,5 +1,7 @@
 # Using Wrapper from an MCP client
 
+> **Published v0.4.2 vs development source:** The npm release provides `submit_task`, `get_task`, `list_tasks`, `cancel_task`, `get_artifact`, `get_metrics` and `list_errors`. This guide also documents `wait_task`, `get_status` and image analysis/editing present in the development source; those additional tools may not be in your installed version. For v0.4.2, use `get_task` to check progress after `submit_task`.
+
 Setup registers the server as `wrapper`. Your client discovers its tools after restarting. In Codex, ask explicitly to use Wrapper; tool names may appear with the server prefix.
 
 ## Submit and collect a response
@@ -15,7 +17,7 @@ Call `submit_task`:
 }
 ```
 
-The response contains a task `id`. Call `wait_task` with that ID to wait for completion for up to 30 seconds without polling. It returns immediately for terminal tasks. On timeout it returns the current state; if still `QUEUED`, `RUNNING` or `VALIDATING`, call it again. `waitMs: 0` takes an immediate snapshot. `get_task` remains available for a snapshot with event history. A `COMPLETED` response includes `result.text`, artifact IDs, provenance and validation results.
+The response contains a task `id`. In the published v0.4.2 release, call `get_task` with that ID to check the status and retrieve its event history. When the task is `COMPLETED`, the result includes `result.text`, artifact IDs, provenance and validation results. In the development source, `wait_task` can await completion for up to 30 seconds without polling; on timeout it returns the current state, and `waitMs: 0` takes an immediate snapshot.
 
 Call `get_status` to inspect provider readiness, supported capabilities, browser state and queue counts without opening the browser.
 
