@@ -347,4 +347,37 @@ describe("MCP protocol", () => {
       { type: "text", text: "A verified test result." },
     ]);
   });
+
+  it("delivers image artifacts as base64 MCP image content without UTF-8 corruption", async () => {
+    const f = fixture(success);
+    const server = http(f);
+    await server.listen({ port: 0, host: "127.0.0.1" });
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [resolve("dist/mcp.js")],
+      env: {
+        ...Object.fromEntries(
+          Object.entries(process.env).filter(
+            (entry): entry is [string, string] => entry[1] !== undefined,
+          ),
+        ),
+        WRAPPER_URL: `http://127.0.0.1:${server.addresses()[0].port}`,
+        LOCAL_API_TOKEN: token,
+      },
+      stderr: "pipe",
+    });
+    const client = new Client({ name: "image-test", version: "1.0.0" });
+    cleanup.push(() => client.close());
+    await client.connect(transport);
+    const bytes = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 255, 128]);
+    const image = f.store.putArtifact(bytes, "image/png", "fixture", "image");
+    const result = await client.callTool({
+      name: "get_artifact",
+      arguments: { id: image.id },
+    });
+    expect(result.content).toEqual([
+      { type: "image", data: bytes.toString("base64"), mimeType: "image/png" },
+    ]);
+  });
+
 });
