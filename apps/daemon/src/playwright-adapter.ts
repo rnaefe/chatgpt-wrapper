@@ -458,9 +458,12 @@ export class PlaywrightAdapter implements Adapter {
     this.active = true;
     this.state = "RUNNING";
     let context: BrowserContext | undefined;
-    // Closing the owned context aborts navigation/evaluation and releases the profile lock.
+    let taskPage: Page | undefined;
+    // Visible mode owns a shared profile; cancel only the task tab, not the login session.
     const abort = () => {
-      void context?.close().catch(() => {});
+      if (context && this.visibleContext === context)
+        void taskPage?.close().catch(() => {});
+      else void context?.close().catch(() => {});
     };
     signal.addEventListener("abort", abort, { once: true });
     try {
@@ -470,13 +473,13 @@ export class PlaywrightAdapter implements Adapter {
         (await openProfile(profileDirectory(this.directory), this.headless));
       if (!this.headless && !this.visibleContext) this.keepVisible(context);
       if (signal.aborted) throw signal.reason;
-      const page = await this.openTaskPage(context);
-      const images = await this.uploadImages(page, request.images);
-      const result = await this.evaluateRequest(page, source, {
+      taskPage = await this.openTaskPage(context);
+      const images = await this.uploadImages(taskPage, request.images);
+      const result = await this.evaluateRequest(taskPage, source, {
         ...request,
         images,
       });
-      const outputImages = await this.downloadImages(page, result.images);
+      const outputImages = await this.downloadImages(taskPage, result.images);
       this.state = "READY";
       this.message = "ChatGPT connected. Last task completed.";
       return {
@@ -501,7 +504,9 @@ export class PlaywrightAdapter implements Adapter {
       );
     } finally {
       signal.removeEventListener("abort", abort);
-      if (this.headless || signal.aborted)
+      // Prevent a new tab from accumulating for every queued task.
+      await taskPage?.close?.().catch(() => {});
+      if (this.headless || (context && this.visibleContext !== context))
         await context?.close().catch(() => {});
       this.active = false;
     }
