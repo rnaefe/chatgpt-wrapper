@@ -14,7 +14,7 @@ The full setup and live coding workflow have been verified on macOS. Windows/Lin
 ## Codex: install in one command
 
 ```bash
-npx -y @rnaefe/chatgpt-wrapper@0.4.2
+npx -y @rnaefe/chatgpt-wrapper@0.5.0
 ```
 
 The installer sets up a persistent runtime and Chromium, creates or updates the `wrapper` MCP entry in Codex, and opens a browser for manual ChatGPT sign-in. It backs up an existing configuration before changing it.
@@ -36,16 +36,16 @@ Use the same installer, choosing a client:
 
 ```bash
 # Cursor
-npx -y @rnaefe/chatgpt-wrapper@0.4.2 setup --client cursor
+npx -y @rnaefe/chatgpt-wrapper@0.5.0 setup --client cursor
 
 # Claude Desktop
-npx -y @rnaefe/chatgpt-wrapper@0.4.2 setup --client claude-desktop
+npx -y @rnaefe/chatgpt-wrapper@0.5.0 setup --client claude-desktop
 ```
 
-| Client | Default configuration |
-| --- | --- |
-| Codex | `$CODEX_HOME/config.toml` or `~/.codex/config.toml` |
-| Cursor | `~/.cursor/mcp.json` |
+| Client         | Default configuration                                                                                                            |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Codex          | `$CODEX_HOME/config.toml` or `~/.codex/config.toml`                                                                              |
+| Cursor         | `~/.cursor/mcp.json`                                                                                                             |
 | Claude Desktop | macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`; Windows: `%APPDATA%/Claude/claude_desktop_config.json` |
 
 On systems without a supported default configuration path, use `--config /absolute/path/to/config`. You can also override the path on supported systems.
@@ -55,7 +55,7 @@ A matching managed Wrapper entry is upgraded in place; unrelated MCP entries are
 Preview the setup plan without changing files:
 
 ```bash
-npx -y @rnaefe/chatgpt-wrapper@0.4.2 setup --client codex --dry-run
+npx -y @rnaefe/chatgpt-wrapper@0.5.0 setup --client codex --dry-run
 ```
 
 To configure without signing in immediately, add `--skip-login`, then run `connect` when you're ready.
@@ -105,11 +105,11 @@ If you want to erase all saved data: stop the worker, uninstall Wrapper from eve
 
 ## Where your data is stored
 
-| Platform | Default location |
-| --- | --- |
-| macOS | `~/Library/Application Support/ChatGPT Wrapper` |
-| Linux | `$XDG_DATA_HOME/chatgpt-wrapper` or `~/.local/share/chatgpt-wrapper` |
-| Windows | `%LOCALAPPDATA%/ChatGPT Wrapper` |
+| Platform | Default location                                                     |
+| -------- | -------------------------------------------------------------------- |
+| macOS    | `~/Library/Application Support/ChatGPT Wrapper`                      |
+| Linux    | `$XDG_DATA_HOME/chatgpt-wrapper` or `~/.local/share/chatgpt-wrapper` |
+| Windows  | `%LOCALAPPDATA%/ChatGPT Wrapper`                                     |
 
 The persistent Chromium profile, local API token, queue, history and logs live here, outside the npm package. Do not share this directory. Task prompts and user-provided image inputs are sent to ChatGPT. Local task retention defaults to 30 days, but credentials and logs remain until manually deleted. See [security and privacy](SECURITY.md).
 

@@ -8,7 +8,7 @@ Connect your own ChatGPT browser session to coding agents using **MCP**. Wrapper
 
 [![A short animated preview of ChatGPT Wrapper](docs/assets/wrapper-demo.gif)](docs/assets/wrapper-demo.mp4)
 
-*The demo is an edited product presentation using captured results; it isn't an uncut recording. No API key is required, but you must sign in with your own ChatGPT account.*
+_The demo is an edited product presentation using captured results; it isn't an uncut recording. No API key is required, but you must sign in with your own ChatGPT account._
 
 ## Quick start
 
@@ -17,7 +17,7 @@ Connect your own ChatGPT browser session to coding agents using **MCP**. Wrapper
 **1. Install and connect to Codex**
 
 ```bash
-npx -y @rnaefe/chatgpt-wrapper@0.4.2
+npx -y @rnaefe/chatgpt-wrapper@0.5.0
 ```
 
 The installer downloads Chromium, configures the Wrapper MCP server in Codex, and backs up any existing configuration before making changes. No clone or manual MCP config editing needed.
@@ -35,8 +35,8 @@ Your coding agent sends the task via MCP; Wrapper returns the result for review.
 **Using a different client?**
 
 ```bash
-npx -y @rnaefe/chatgpt-wrapper@0.4.2 setup --client cursor
-npx -y @rnaefe/chatgpt-wrapper@0.4.2 setup --client claude-desktop
+npx -y @rnaefe/chatgpt-wrapper@0.5.0 setup --client cursor
+npx -y @rnaefe/chatgpt-wrapper@0.5.0 setup --client claude-desktop
 ```
 
 These commands configure the selected MCP client; support for its configuration format doesn't imply every OS and browser combination has been tested. See [installation and custom paths](docs/INSTALLATION.md).
@@ -60,7 +60,7 @@ flowchart LR
 
 Wrapper is a **task bridge**, not another autonomous coding agent. Your MCP client handles planning, source files, applying changes, and reviewing generated output.
 
-The published **v0.4.2** package focuses on code generation, code review, reasoning, and image generation. Additional features in the development source may not yet be in the npm release. See [MCP usage](docs/MCP.md) for task schemas and [releases](https://github.com/rnaefe/chatgpt-wrapper/releases) for shipped versions.
+Version **0.5.0** includes code generation, code review, reasoning, image generation, image analysis and image editing, plus `wait_task`, `get_status` and chat-ready image exports. Image analysis and editing require input images; live provider access remains dependent on the account and browser UI. See [MCP usage](docs/MCP.md) for task schemas and [releases](https://github.com/rnaefe/chatgpt-wrapper/releases) for shipped versions.
 
 ## Useful commands
 
@@ -82,14 +82,14 @@ Uninstall preserves your local profile and task data so other installed clients 
 
 ## Good to know
 
-| Question | Answer |
-| --- | --- |
-| **Is this an official OpenAI integration?** | No. This is an independent experimental project that automates the ChatGPT web interface, not an official API. |
-| **Does it bypass account limits or verification?** | No. Your normal account limits apply; login and browser challenges require you. |
-| **Will it work headlessly?** | Headless mode is experimental and has encountered browser verification. Visible mode is the default. |
-| **Is it reliable on Windows/Linux?** | Client configuration is supported in documented environments, but equivalent live end-to-end acceptance hasn't been completed. |
-| **Where is my data?** | Your profile, task history and local diagnostics stay on your machine. Task prompts and uploaded content are sent to ChatGPT. |
-| **Will it edit my repository?** | No. It returns results to the MCP client, which decides what to do with them. |
+| Question                                           | Answer                                                                                                                         |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Is this an official OpenAI integration?**        | No. This is an independent experimental project that automates the ChatGPT web interface, not an official API.                 |
+| **Does it bypass account limits or verification?** | No. Your normal account limits apply; login and browser challenges require you.                                                |
+| **Will it work headlessly?**                       | Headless mode is experimental and has encountered browser verification. Visible mode is the default.                           |
+| **Is it reliable on Windows/Linux?**               | Client configuration is supported in documented environments, but equivalent live end-to-end acceptance hasn't been completed. |
+| **Where is my data?**                              | Your profile, task history and local diagnostics stay on your machine. Task prompts and uploaded content are sent to ChatGPT.  |
+| **Will it edit my repository?**                    | No. It returns results to the MCP client, which decides what to do with them.                                                  |
 
 **Security:** Treat the saved browser profile and local tokens as credentials. Do not publish them, and only submit data you are authorized to share. Review the provider's applicable terms. [Security and privacy](docs/SECURITY.md) · [Known browser limitations](docs/BROWSER_RELIABILITY.md).
 

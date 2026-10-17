@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 — 2026-10-17
 
 - Add image analysis and editing, requiring image references and the appropriate output artifacts.
 - Wake the queue on committed task changes and add `wait_task` and `get_status` MCP tools.
@@ -9,7 +9,7 @@
 - Preserve task objectives and constraints in a JSON prompt envelope with capability-specific output expectations.
 - Propagate task cancellation into remote image downloads; index task event history and avoid empty text artifacts for image-only results.
 - Prevent reference attachments and streaming previews from being returned as finished generated images.
-- Replace the silent onboarding video with a 40-second 1080p product film, original music, captions and reproducible asset publishing.
+- Replace the silent onboarding video with a 40-second 1080p product film, original music and captions.
 
 - Use `playwright-extra` for the browser runtime, retaining Playwright for browser installation and types.
 

@@ -1,6 +1,6 @@
 # Roadmap
 
-The current public release is [0.4.2](https://github.com/rnaefe/chatgpt-wrapper/releases/tag/v0.4.2). The project focuses on a local browser worker and MCP, with Codex as the primary setup target.
+The current public release is [0.5.0](https://www.npmjs.com/package/@rnaefe/chatgpt-wrapper/v/0.5.0). The project focuses on a local browser worker and MCP, with Codex as the primary setup target.
 
 ## Delivered
 
