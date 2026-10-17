@@ -1,114 +1,118 @@
 # Installation
 
-## Install
+The quickest way to use ChatGPT Wrapper is through the published npm package. **You do not need to clone this repository.**
 
-Version `0.4.2` adds default Codex setup, managed upgrades and uninstall. Registry installation, persistent runtime setup, and the seven-tool MCP handshake were verified on macOS on 2026-10-17. The package name is `@rnaefe/chatgpt-wrapper`. The unscoped `chatgpt-wrapper` name belongs to an existing, different npm package.
+## Requirements
 
-Run:
+- **Node.js 24+** and npm.
+- A desktop environment that can open Chromium.
+- A ChatGPT account and permission to use the provider interface.
+- An MCP client such as Codex. Configuration helpers are also available for Cursor and Claude Desktop.
 
-```sh
+The full setup and live coding workflow have been verified on macOS. Windows/Linux browser execution has not yet received equivalent end-to-end acceptance testing. Headless mode is experimental.
+
+## Codex: install in one command
+
+```bash
 npx -y @rnaefe/chatgpt-wrapper@0.4.2
 ```
 
-Requires Node.js 24+ with npm and a desktop session for manual ChatGPT sign-in. No repository clone, pnpm, API key, or manual MCP JSON/TOML editing is needed by end users.
+The installer sets up a persistent runtime and Chromium, creates or updates the `wrapper` MCP entry in Codex, and opens a browser for manual ChatGPT sign-in. It backs up an existing configuration before changing it.
 
-The development CLI also checks the installed MCP connection before declaring setup complete; this progress display is an unreleased improvement. The [demo source](../video/README.md) records the exact scope.
+Once sign-in succeeds:
 
-Setup installs a versioned runtime in the user's application-data directory, installs Playwright Chromium, configures the selected client, and opens the sign-in flow. MCP points to that persistent runtime, not the temporary `npx` cache. Restart the MCP client after setup.
+1. Restart Codex so it picks up the new MCP server.
+2. Ask Codex to use Wrapper, for example:
 
-Visible browser mode is selected during setup. Complete login or browser verification yourself. The window closes after sign-in; each task opens the saved profile and closes its window when finished. `--headless` is experimental and may encounter provider verification. Nothing automatically solves or bypasses verification.
+   > Use Wrapper to generate a TypeScript clamp function with explicit types. Check the task until it finishes and show me the result.
 
-## Test the package before publishing
+3. Review the result before applying any changes.
 
-Maintainers build and pack the candidate:
+There is no OpenAI API key requirement. **This is an unofficial browser integration; account limits and verification challenges still apply.**
 
-```sh
-pnpm install
-pnpm build
-npm pack --ignore-scripts
+## Other MCP clients
+
+Use the same installer, choosing a client:
+
+```bash
+# Cursor
+npx -y @rnaefe/chatgpt-wrapper@0.4.2 setup --client cursor
+
+# Claude Desktop
+npx -y @rnaefe/chatgpt-wrapper@0.4.2 setup --client claude-desktop
 ```
 
-Then, from any directory, using the absolute tarball path:
+| Client | Default configuration |
+| --- | --- |
+| Codex | `$CODEX_HOME/config.toml` or `~/.codex/config.toml` |
+| Cursor | `~/.cursor/mcp.json` |
+| Claude Desktop | macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`; Windows: `%APPDATA%/Claude/claude_desktop_config.json` |
 
-```sh
-npx -y --package /absolute/path/rnaefe-chatgpt-wrapper-0.4.2.tgz chatgpt-wrapper setup --client codex --package /absolute/path/rnaefe-chatgpt-wrapper-0.4.2.tgz
+On systems without a supported default configuration path, use `--config /absolute/path/to/config`. You can also override the path on supported systems.
+
+A matching managed Wrapper entry is upgraded in place; unrelated MCP entries are preserved. A conflicting `wrapper` entry requires `--replace`. Existing configuration files are backed up before modification. Serialization may normalize formatting or remove comments, so keep your backups.
+
+Preview the setup plan without changing files:
+
+```bash
+npx -y @rnaefe/chatgpt-wrapper@0.4.2 setup --client codex --dry-run
 ```
 
-`--package` tells setup to install that tarball into its persistent runtime. Without it, setup installs the exact published name and version of the running CLI.
+To configure without signing in immediately, add `--skip-login`, then run `connect` when you're ready.
 
-`pnpm test:package` automates a clean install in a temporary directory. It preserves another Codex server, removes the temporary bootstrap installation, then initializes MCP from the persistent runtime. It does not access a ChatGPT account or send prompts.
+## Use Wrapper
 
-## Client configuration
+Once installed, the MCP server appears as **`wrapper`** in your client after restart. Ask the client to submit a task and inspect its result. You can also use the exposed tools directly.
 
-Supported setup targets:
+See the [MCP usage guide](MCP.md) for capabilities, request schema, task statuses and artifact retrieval.
 
-| Client           | Default configuration                                                                                                          |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `codex`          | `$CODEX_HOME/config.toml`, or `~/.codex/config.toml`                                                                           |
-| `cursor`         | `~/.cursor/mcp.json`                                                                                                           |
-| `claude-desktop` | macOS `~/Library/Application Support/Claude/claude_desktop_config.json`; Windows `%APPDATA%/Claude/claude_desktop_config.json` |
+## Check or repair an installation
 
-Use `--config /absolute/path` for an explicit configuration file. Claude Desktop's automatic path is supported on macOS and Windows; other systems require `--config`.
+```bash
+# Inspect local installation without starting a browser
+npx -y @rnaefe/chatgpt-wrapper@latest doctor
 
-Existing settings and other MCP servers are preserved as values. Config serialization can normalize formatting and remove comments. Every changed existing file gets an exact, private backup next to it. Invalid config files are not overwritten. An entry pointing to a versioned Wrapper runtime in the same data directory is upgraded automatically. An unrelated or differently scoped `wrapper` entry requires `--replace`; a matching entry is left untouched.
+# Start the sign-in flow again if needed
+npx -y @rnaefe/chatgpt-wrapper@latest connect
 
-Preview without installing, downloading, or writing:
-
-```sh
-chatgpt-wrapper setup --client codex --dry-run
+# Inspect the current worker/browser status
+npx -y @rnaefe/chatgpt-wrapper@latest status
 ```
 
-Setup config formats follow the [Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli), [Cursor MCP documentation](https://cursor.com/help/customization/mcp), and [Claude Desktop MCP quickstart](https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-local-servers).
+The browser opens visibly for authentication and each task. It closes after use and reuses the private saved profile. Browser challenges must be completed manually. Wrapper does not automatically replay interrupted submissions.
 
-## Commands and options
-
-- No command, or `setup`: install, configure Codex, and sign in. Other clients use `--client`.
-- `update`: install the running CLI version, stop the authenticated idle worker, and upgrade its managed client entry. Reuses the saved session without opening sign-in.
-- `uninstall`: stop the authenticated idle worker and remove only Wrapper from the selected client with an exact backup. Saved profiles, history, logs and runtime files are preserved.
-- `setup --skip-login`: configure now, sign in later. Prints the exact installed command.
-- `setup --replace`: update an existing Wrapper entry after backing up the config.
-- `connect`: install Chromium if missing and sign in if needed. A ready worker skips the window; concurrent calls join existing sign-in. `--force-login` explicitly opens sign-in again.
-- `mcp`: stdio MCP server; stdout is reserved for protocol messages.
-- `stop`: stop an authenticated idle worker and close its browser, keeping saved data. Refuses unfinished tasks or a mismatched PID.
-- `verify-browser --mode both`: explicitly run live probes; see [browser reliability](BROWSER_RELIABILITY.md).
-- `metrics --hours 24` and `errors --hours 24 --limit 20`: inspect local task metrics; see [observability](OBSERVABILITY.md).
-- `status`: show worker/browser status as JSON. Starts the local worker if needed.
-- `doctor`: inspect local paths and process status without starting a worker or browser.
-
-`--data-dir` and `--port` are stored in the MCP entry so the client uses the same private runtime. Choose another port when an existing development worker owns 11435. The installer does not terminate unrelated workers or overwrite their session data.
-
-Default application data:
-
-- macOS: `~/Library/Application Support/ChatGPT Wrapper`
-- Linux: `$XDG_DATA_HOME/chatgpt-wrapper`, or `~/.local/share/chatgpt-wrapper`
-- Windows: `%LOCALAPPDATA%/ChatGPT Wrapper`
-
-Profiles, tokens, task databases, and logs live outside the package and survive package upgrades. Do not share this directory. Development commands keep using the repository's `.data` unless `DATA_DIR` is set. Packaged commands never read a `.env` from the caller's working directory.
+If it cannot connect, see [troubleshooting](TROUBLESHOOTING.md). If a headless task is blocked, use the default visible mode instead of attempting to bypass verification. See [browser reliability](BROWSER_RELIABILITY.md) for known limitations.
 
 ## Updating and removing
 
-Run:
+Upgrade the managed runtime and MCP entry:
 
-```sh
+```bash
 npx -y @rnaefe/chatgpt-wrapper@latest update
 ```
 
-Select the same `--client` and `--config` for a custom installation. Managed entries supply their saved data directory, port, mode, and additional environment settings automatically; explicit flags override them. Setup and update recognize versioned runtimes for the same data directory and back up config changes. Other entries still require `--replace`. New runtime and browser installation finish before an idle worker is stopped. Active or queued work blocks migration. Restart the MCP client afterwards; the next task checks the saved session. If it expired, run `connect`.
+Restart your MCP client afterward. For a custom client or configuration path, pass the same `--client` and `--config` values used during setup. Wrapper won't silently cancel unfinished tasks during an update.
 
-To disconnect:
+To remove the Wrapper entry from a selected client:
 
-```sh
+```bash
 npx -y @rnaefe/chatgpt-wrapper@latest uninstall
 ```
 
-Uninstall removes only the selected client's Wrapper entry and stops its idle worker. Other client settings remain. The exact config backup, saved profile, history, logs and installed runtimes remain on disk. If other clients use Wrapper, their next request can start it again. To erase personal data, first remove Wrapper from all clients and stop the worker, then remove the printed data directory. Uninstall does not silently erase user data or shared browser downloads.
+This removes the selected client's managed configuration entry but **does not erase** browser credentials, history, runtime packages, logs or task artifacts. If several clients use Wrapper, remove each entry first.
 
-## Maintainer release checks
+If you want to erase all saved data: stop the worker, uninstall Wrapper from every client, then manually delete the printed application-data directory. Be sure no other installation uses it.
 
-```sh
-pnpm release:check
-node scripts/test-package.mjs --registry
-npm pack --dry-run --ignore-scripts
-```
+## Where your data is stored
 
-The package contains built distribution files, the README, license and this guide. Workspace source packages and their `workspace:*` dependencies are bundled; npm users do not need the monorepo. There are no install scripts or CI workflows. Do not publish until npm namespace access, licensing, and provider authorization for distribution have been reviewed.
+| Platform | Default location |
+| --- | --- |
+| macOS | `~/Library/Application Support/ChatGPT Wrapper` |
+| Linux | `$XDG_DATA_HOME/chatgpt-wrapper` or `~/.local/share/chatgpt-wrapper` |
+| Windows | `%LOCALAPPDATA%/ChatGPT Wrapper` |
+
+The persistent Chromium profile, local API token, queue, history and logs live here, outside the npm package. Do not share this directory. Task prompts and user-provided image inputs are sent to ChatGPT. Local task retention defaults to 30 days, but credentials and logs remain until manually deleted. See [security and privacy](SECURITY.md).
+
+## Developers
+
+Want to change the source instead of installing the npm release? Start with [CONTRIBUTING.md](../CONTRIBUTING.md) for the workspace setup, tests, and release checks.
