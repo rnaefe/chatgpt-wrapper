@@ -112,6 +112,22 @@ describe("durable queue", () => {
     store.transition(t.id, "CANCELLED");
     expect(store.transition(t.id, "RUNNING").status).toBe("CANCELLED");
   });
+  it("fails code generation with no code fence or unified diff", async () => {
+    const f = fixture({
+      ...success,
+      execute: async () => ({
+        text: "Here is your code without a fenced block.",
+        adapter: "test",
+        model: "fixture",
+      }),
+    });
+    const task = f.store.submit(request({ capability: "code.generate" })).task;
+    await f.worker.tick();
+    expect(f.store.get(task.id)).toMatchObject({
+      status: "FAILED",
+      error: { code: "VALIDATION_FAILED" },
+    });
+  });
   it("prunes terminal tasks and removes only unreferenced artifacts", () => {
     const { store } = fixture();
     const artifact = store.putArtifact(Buffer.from("old"), "text/plain", "test");
