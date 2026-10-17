@@ -141,7 +141,16 @@ it("keeps the visible login context for subsequent MCP tasks", async () => {
     await connected;
     expect(adapter.status().state).toBe("READY");
     expect(close).not.toHaveBeenCalled();
+    const taskPageClose = vi.fn().mockResolvedValue(undefined);
+    const newPage = vi.fn(async () => ({
+      ...page,
+      close: taskPageClose,
+    }));
+    Object.assign(context, { newPage });
     await adapter.execute(request, new AbortController().signal);
+    await adapter.execute(request, new AbortController().signal);
+    expect(newPage).toHaveBeenCalledTimes(2);
+    expect(taskPageClose).toHaveBeenCalledTimes(2);
     expect(mocks.launch).toHaveBeenCalledOnce();
     expect(mocks.launch).toHaveBeenCalledWith(
       expect.any(String),
