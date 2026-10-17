@@ -112,6 +112,26 @@ describe("durable queue", () => {
     store.transition(t.id, "CANCELLED");
     expect(store.transition(t.id, "RUNNING").status).toBe("CANCELLED");
   });
+  it("prunes terminal tasks and removes only unreferenced artifacts", () => {
+    const { store } = fixture();
+    const artifact = store.putArtifact(Buffer.from("old"), "text/plain", "test");
+    const old = store.submit(request()).task;
+    store.transition(old.id, "RUNNING");
+    store.transition(old.id, "VALIDATING");
+    store.transition(old.id, "COMPLETED", {
+      result: {
+        text: "old",
+        artifacts: [artifact],
+        provenance: { adapter: "test", model: "test" },
+        validation: { passed: true, checks: [] },
+      },
+    });
+    const queued = store.submit(request()).task;
+    expect(store.pruneOlderThan(new Date(Date.now() + 10_000))).toEqual({ tasks: 1, artifacts: 1 });
+    expect(store.get(old.id)).toBeUndefined();
+    expect(store.get(queued.id)?.status).toBe("QUEUED");
+    expect(() => store.artifactData(artifact.id)).toThrow("Artifact not found");
+  });
   it("rejects unsupported image capabilities", () => {
     expect(
       taskRequestSchema.safeParse({
