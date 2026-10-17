@@ -10,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 const mocks = vi.hoisted(() => ({ launch: vi.fn() }));
-vi.mock("playwright", () => ({
+vi.mock("playwright-extra", () => ({
   chromium: { launchPersistentContext: mocks.launch },
 }));
 import {

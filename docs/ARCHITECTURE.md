@@ -17,3 +17,5 @@ The root package builds `dist/cli.js`, `dist/daemon.js`, `dist/mcp.js`, and the 
 Setup installs an exact package version under the private application-data directory and writes an absolute Node/CLI command into the chosen MCP client config. This keeps the server usable when npx removes its temporary package. Runtime profiles, database and logs live outside the installed package. Config merges preserve unrelated values and keep exact backups; formatting/comments may be normalized.
 
 Development runtime paths and packaged runtime paths are resolved centrally in `runtime-paths.ts`. Only development loads the repository's `.env`; neither mode loads configuration from an arbitrary caller working directory.
+
+The Chromium runtime is provided by `playwright-extra`; the underlying Playwright installation supplies browser binaries and types. No plugins are registered. Local Chromium fixture tests exercise the same persistent-context launcher as provider tasks. This integration does not establish headless access through provider verification.

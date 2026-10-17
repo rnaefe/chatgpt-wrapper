@@ -3,7 +3,8 @@ import type { WebRequest } from "./page-engine.js";
 import { mkdirSync, chmodSync } from "node:fs";
 import { join, isAbsolute, sep } from "node:path";
 import { readFile, realpath, stat } from "node:fs/promises";
-import { chromium, type BrowserContext, type Page } from "playwright";
+import type { BrowserContext, Page } from "playwright";
+import { chromium } from "playwright-extra";
 import {
   ProviderError,
   type Adapter,
@@ -14,6 +15,11 @@ import type {
   Capability,
   TaskStatus,
 } from "@chatgpt-wrapper/contracts";
+
+const stealth = require('puppeteer-extra-plugin-stealth')()
+
+// Add the plugin to playwright (any number of plugins can be added)
+chromium.use(stealth)
 
 const CHATGPT_ORIGIN = "https://chatgpt.com";
 const NAVIGATION_TIMEOUT_MS = 45_000;

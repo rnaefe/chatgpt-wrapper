@@ -26,6 +26,10 @@ The public npm artifact matched the published SHA-512 integrity value. `node scr
 
 Separately, `npx -y @rnaefe/chatgpt-wrapper@0.4.0 connect --visible` reopened the existing saved profile. A code task through the existing Codex Wrapper integration completed in 11,536 ms and returned the exact requested TypeScript function. This checks saved-session reuse, not a new user sign-in or a replacement of the existing Codex integration.
 
+## Browser runtime change — unreleased
+
+After moving Chromium launch to `playwright-extra` without plugins, the local persistent-context Chromium fixture and all 77 tests passed. A fresh live headless probe on 2026-10-17 remained blocked before submission (`NEEDS_HUMAN` / `BROWSER_CHALLENGE`, 2,018 ms). Changing the launcher did not establish headless provider access.
+
 ## Repeat the live check
 
 This command sends up to two small, fixed public TypeScript prompts per mode. Run it only when that provider interaction is authorized. It does not collect repository source or run generated output.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Use `playwright-extra` for the browser runtime, retaining Playwright for browser installation and types.
+
 - Guide setup through concise progress steps and verify the installed MCP connection before declaring completion.
 
 - Add MCP usage and troubleshooting guides, contributor package map and GitHub reporting templates.
