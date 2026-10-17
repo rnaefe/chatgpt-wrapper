@@ -112,6 +112,49 @@ describe("durable queue", () => {
     store.transition(t.id, "CANCELLED");
     expect(store.transition(t.id, "RUNNING").status).toBe("CANCELLED");
   });
+  it("fails code generation with no code fence or unified diff", async () => {
+    const f = fixture({
+      ...success,
+      execute: async () => ({
+        text: "Here is your code without a fenced block.",
+        adapter: "test",
+        model: "fixture",
+      }),
+    });
+    const task = f.store.submit(request({ capability: "code.generate" })).task;
+    await f.worker.tick();
+    expect(f.store.get(task.id)).toMatchObject({
+      status: "FAILED",
+      error: { code: "VALIDATION_FAILED" },
+    });
+  });
+  it("prunes terminal tasks and removes only unreferenced artifacts", () => {
+    const { store } = fixture();
+    const artifact = store.putArtifact(
+      Buffer.from("old"),
+      "text/plain",
+      "test",
+    );
+    const old = store.submit(request()).task;
+    store.transition(old.id, "RUNNING");
+    store.transition(old.id, "VALIDATING");
+    store.transition(old.id, "COMPLETED", {
+      result: {
+        text: "old",
+        artifacts: [artifact],
+        provenance: { adapter: "test", model: "test" },
+        validation: { passed: true, checks: [] },
+      },
+    });
+    const queued = store.submit(request()).task;
+    expect(store.pruneOlderThan(new Date(Date.now() + 10_000))).toEqual({
+      tasks: 1,
+      artifacts: 1,
+    });
+    expect(store.get(old.id)).toBeUndefined();
+    expect(store.get(queued.id)?.status).toBe("QUEUED");
+    expect(() => store.artifactData(artifact.id)).toThrow("Artifact not found");
+  });
   it("rejects unsupported image capabilities", () => {
     expect(
       taskRequestSchema.safeParse({
@@ -345,6 +388,38 @@ describe("MCP protocol", () => {
     });
     expect(artifact.content).toEqual([
       { type: "text", text: "A verified test result." },
+    ]);
+  });
+
+  it("delivers image artifacts as base64 MCP image content without UTF-8 corruption", async () => {
+    const f = fixture(success);
+    const server = http(f);
+    await server.listen({ port: 0, host: "127.0.0.1" });
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [resolve("dist/mcp.js")],
+      env: {
+        ...Object.fromEntries(
+          Object.entries(process.env).filter(
+            (entry): entry is [string, string] => entry[1] !== undefined,
+          ),
+        ),
+        WRAPPER_URL: `http://127.0.0.1:${server.addresses()[0].port}`,
+        LOCAL_API_TOKEN: token,
+      },
+      stderr: "pipe",
+    });
+    const client = new Client({ name: "image-test", version: "1.0.0" });
+    cleanup.push(() => client.close());
+    await client.connect(transport);
+    const bytes = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 255, 128]);
+    const image = f.store.putArtifact(bytes, "image/png", "fixture", "image");
+    const result = await client.callTool({
+      name: "get_artifact",
+      arguments: { id: image.id },
+    });
+    expect(result.content).toEqual([
+      { type: "image", data: bytes.toString("base64"), mimeType: "image/png" },
     ]);
   });
 });

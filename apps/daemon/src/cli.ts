@@ -2,7 +2,7 @@
 import { parseArgs } from "node:util";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { configureClient } from "./client-config.js";
+import { configureClient, managedClientEntry } from "./client-config.js";
 import { installRuntime, installBrowser, runNode } from "./install-runtime.js";
 import {
   packageMetadata,
@@ -78,12 +78,12 @@ async function main() {
     console.log(packageMetadata.version);
     return;
   }
-  const command = positionals[0];
-  if (values.help || !command) {
+  const command = positionals[0] ?? "setup";
+  if (values.help) {
     console.log(help);
     return;
   }
-  if (positionals.length !== 1)
+  if (positionals.length > 1)
     throw new Error("Unexpected arguments. Run chatgpt-wrapper --help.");
   if (values["data-dir"]) process.env.DATA_DIR = resolve(values["data-dir"]);
   if (values.port) {
@@ -107,15 +107,32 @@ async function main() {
       throw new Error(
         "Choose an MCP client with --client codex, cursor, or claude-desktop.",
       );
+    const saved = managedClientEntry(client, values.config);
     const directory = resolve(
-      values["data-dir"] ?? process.env.DATA_DIR ?? userDataDirectory(),
+      values["data-dir"] ??
+        saved?.env.DATA_DIR ??
+        process.env.DATA_DIR ??
+        userDataDirectory(),
     );
-    const port = String(values.port ?? process.env.PORT ?? 11435);
+    const port = String(
+      values.port ?? saved?.env.PORT ?? process.env.PORT ?? 11435,
+    );
+    if (
+      !Number.isInteger(Number(port)) ||
+      Number(port) < 1 ||
+      Number(port) > 65535
+    )
+      throw new Error("Configured port must be between 1 and 65535.");
     const env = {
+      ...saved?.env,
       DATA_DIR: directory,
       PORT: port,
       WRAPPER_URL: `http://127.0.0.1:${port}`,
-      BROWSER_HEADLESS: values.headless ? "true" : "false",
+      BROWSER_HEADLESS: values.headless
+        ? "true"
+        : values.visible
+          ? "false"
+          : (saved?.env.BROWSER_HEADLESS ?? "false"),
     };
     if (command === "uninstall") {
       const options = {

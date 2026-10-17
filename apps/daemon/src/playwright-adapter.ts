@@ -1,8 +1,8 @@
 import { inspectReadiness, waitForSignIn } from "./browser-onboarding.js";
 import type { WebRequest } from "./page-engine.js";
 import { mkdirSync, chmodSync } from "node:fs";
-import { join } from "node:path";
-import { readFile } from "node:fs/promises";
+import { join, isAbsolute, sep } from "node:path";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { chromium, type BrowserContext, type Page } from "playwright";
 import {
   ProviderError,
@@ -18,6 +18,67 @@ import type {
 const CHATGPT_ORIGIN = "https://chatgpt.com";
 const NAVIGATION_TIMEOUT_MS = 45_000;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_IMAGE_MIMES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+]);
+
+/** MCP clients can request work but must not read arbitrary local files. */
+export async function validateImagePath(path: string): Promise<string> {
+  const roots = (process.env.IMAGE_INPUT_ROOTS ?? "")
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (!roots.length || !isAbsolute(path))
+    throw new ProviderError(
+      "IMAGE_PATH_NOT_ALLOWED",
+      "Local image paths require an absolute path and explicit IMAGE_INPUT_ROOTS configuration.",
+    );
+  const realPath = await realpath(path);
+  const file = await stat(realPath);
+  if (!file.isFile() || file.size > MAX_IMAGE_BYTES)
+    throw new ProviderError(
+      "IMAGE_PATH_NOT_ALLOWED",
+      "Image input must be a regular file at most 10 MiB.",
+    );
+  for (const root of roots) {
+    if (!isAbsolute(root)) continue;
+    const realRoot = await realpath(root).catch(() => undefined);
+    if (
+      realRoot &&
+      (realPath === realRoot || realPath.startsWith(realRoot + sep))
+    )
+      return realPath;
+  }
+  throw new ProviderError(
+    "IMAGE_PATH_NOT_ALLOWED",
+    "Image path is outside configured IMAGE_INPUT_ROOTS (symlinks are resolved).",
+  );
+}
+
+/** Remote downloads are disabled unless their exact trusted hostname is configured. */
+export function validateImageUrl(input: string): URL {
+  const url = new URL(input);
+  const allowed = (process.env.ALLOWED_IMAGE_HOSTS ?? "")
+    .split(",")
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean);
+  if (
+    url.protocol !== "https:" ||
+    url.port ||
+    url.username ||
+    url.password ||
+    !allowed.includes(url.hostname.toLowerCase())
+  )
+    throw new ProviderError(
+      "IMAGE_URL_NOT_ALLOWED",
+      "HTTPS image downloads require an exact hostname in ALLOWED_IMAGE_HOSTS.",
+    );
+  return url;
+}
 const capabilities: Capability[] = [
   "code.generate",
   "code.review",
@@ -78,7 +139,7 @@ export class PlaywrightAdapter implements Adapter {
   }
   private state: TaskStatus | "READY" | "SIGNING_IN" | "VERIFYING" =
     "NEEDS_AUTH";
-  private message = "Run pnpm connect to sign in.";
+  private message = "Run chatgpt-wrapper connect to sign in.";
 
   constructor(
     private readonly directory: string,
@@ -167,7 +228,7 @@ export class PlaywrightAdapter implements Adapter {
     if (problem?.code === "BROWSER_CHALLENGE")
       throw new ProviderError(
         "HEADLESS_CHALLENGE",
-        `Sign-in was saved. Headless check: ${problem.message} To try visible execution, set BROWSER_HEADLESS=false, restart the worker, and run pnpm connect.`,
+        `Sign-in was saved. Headless check: ${problem.message} To try visible execution, set BROWSER_HEADLESS=false, restart the worker, and run chatgpt-wrapper connect.`,
         "NEEDS_HUMAN",
       );
     if (problem)
@@ -178,7 +239,7 @@ export class PlaywrightAdapter implements Adapter {
       );
     throw new ProviderError(
       "BACKGROUND_NOT_READY",
-      "Sign-in was saved, but the background connection needs attention. Run pnpm connect to review the browser.",
+      "Sign-in was saved, but the background connection needs attention. Run chatgpt-wrapper connect to review the browser.",
       "NEEDS_HUMAN",
     );
   }
@@ -191,7 +252,7 @@ export class PlaywrightAdapter implements Adapter {
     if (new URL(page.url()).origin !== CHATGPT_ORIGIN)
       throw new ProviderError(
         "LOGIN_REQUIRED",
-        "Run pnpm connect to sign in.",
+        "Run chatgpt-wrapper connect to sign in.",
         "NEEDS_AUTH",
       );
 
@@ -253,15 +314,16 @@ export class PlaywrightAdapter implements Adapter {
     input: TaskRequest["images"][number],
   ): Promise<UploadFile> {
     if (input.source === "path") {
-      const buffer = await readFile(input.path);
+      const safePath = await validateImagePath(input.path);
+      const buffer = await readFile(safePath);
       if (buffer.length > MAX_IMAGE_BYTES)
         throw new ProviderError(
           "IMAGE_TOO_LARGE",
-          `Image exceeds the ${MAX_IMAGE_BYTES / 1024 / 1024} MiB limit: ${input.path}`,
+          "Local image exceeds 10 MiB.",
         );
       return {
-        name: input.path.split("/").at(-1) || "image",
-        mimeType: imageMime(input.path),
+        name: safePath.split(sep).at(-1) || "image",
+        mimeType: imageMime(safePath),
         buffer,
       };
     }
@@ -274,7 +336,8 @@ export class PlaywrightAdapter implements Adapter {
         );
       return { name: input.name, mimeType: input.mime, buffer };
     }
-    const response = await fetch(input.url, {
+    const url = validateImageUrl(input.url);
+    const response = await fetch(url, {
       signal: AbortSignal.timeout(15_000),
       redirect: "error",
     });
@@ -283,22 +346,45 @@ export class PlaywrightAdapter implements Adapter {
         "IMAGE_DOWNLOAD_FAILED",
         `Could not download image (HTTP ${response.status}).`,
       );
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const mimeType = response.headers.get("content-type")?.split(";")[0];
-    if (!mimeType?.startsWith("image/"))
+    const mimeType = response.headers
+      .get("content-type")
+      ?.split(";")[0]
+      ?.toLowerCase();
+    if (!mimeType || !ALLOWED_IMAGE_MIMES.has(mimeType))
       throw new ProviderError(
         "IMAGE_TYPE_UNSUPPORTED",
-        "Image URL did not return an image.",
+        "Remote URL did not return a supported image.",
       );
-    if (buffer.length > MAX_IMAGE_BYTES)
+    if (!response.body)
       throw new ProviderError(
-        "IMAGE_TOO_LARGE",
-        `Image exceeds the ${MAX_IMAGE_BYTES / 1024 / 1024} MiB limit.`,
+        "IMAGE_DOWNLOAD_FAILED",
+        "Remote image response has no body.",
       );
+    // Enforce the limit during streaming, rather than allocating an unbounded arrayBuffer.
+    const reader = response.body.getReader();
+    const chunks: Buffer[] = [];
+    let total = 0;
+    try {
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        total += chunk.value.byteLength;
+        if (total > MAX_IMAGE_BYTES) {
+          await reader.cancel();
+          throw new ProviderError(
+            "IMAGE_TOO_LARGE",
+            "Remote image exceeds 10 MiB.",
+          );
+        }
+        chunks.push(Buffer.from(chunk.value));
+      }
+    } finally {
+      reader.releaseLock();
+    }
     return {
-      name: new URL(input.url).pathname.split("/").at(-1) || "image",
+      name: url.pathname.split("/").at(-1) || "image",
       mimeType,
-      buffer,
+      buffer: Buffer.concat(chunks, total),
     };
   }
 
@@ -421,7 +507,7 @@ export class PlaywrightAdapter implements Adapter {
       this.message =
         error instanceof ProviderError
           ? error.message
-          : "Could not finish connecting. Run pnpm connect to try again.";
+          : "Could not finish connecting. Run chatgpt-wrapper connect to try again.";
       throw error;
     } finally {
       await context?.close().catch(() => {});
@@ -447,7 +533,8 @@ export class PlaywrightAdapter implements Adapter {
     this.active = true;
     this.state = "RUNNING";
     let context: BrowserContext | undefined;
-    // Closing the owned context aborts navigation/evaluation and releases the profile lock.
+    let taskPage: Page | undefined;
+    // Closing this task's context cancels evaluation and releases its profile.
     const abort = () => {
       void context?.close().catch(() => {});
     };
@@ -460,13 +547,13 @@ export class PlaywrightAdapter implements Adapter {
       );
       this.taskContext = context;
       if (signal.aborted) throw signal.reason;
-      const page = await this.openTaskPage(context);
-      const images = await this.uploadImages(page, request.images);
-      const result = await this.evaluateRequest(page, source, {
+      taskPage = await this.openTaskPage(context);
+      const images = await this.uploadImages(taskPage, request.images);
+      const result = await this.evaluateRequest(taskPage, source, {
         ...request,
         images,
       });
-      const outputImages = await this.downloadImages(page, result.images);
+      const outputImages = await this.downloadImages(taskPage, result.images);
       this.state = "READY";
       this.message = "ChatGPT connected. Last task completed.";
       return {

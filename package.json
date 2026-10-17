@@ -1,6 +1,6 @@
 {
   "name": "@rnaefe/chatgpt-wrapper",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "type": "module",
   "packageManager": "pnpm@10.0.0",
   "scripts": {
@@ -50,7 +50,8 @@
     "docs/INSTALLATION.md",
     "CHANGELOG.md",
     "docs/BROWSER_RELIABILITY.md",
-    "docs/OBSERVABILITY.md"
+    "docs/OBSERVABILITY.md",
+    "docs/SECURITY.md"
   ],
   "publishConfig": {
     "access": "public"

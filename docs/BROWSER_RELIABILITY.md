@@ -55,6 +55,14 @@ After verification, reopen the normal visible session:
 chatgpt-wrapper connect --visible
 ```
 
+## Fault recovery coverage — 0.4.2
+
+On 2026-10-17 the merged 0.4.2 code completed two live visible probes in 10,036 ms and 11,032 ms, reopening and closing the saved profile for each task.
+
+Controlled adapter fixtures cover expired-session redirects, browser verification, interrupted evaluation, manual window closure, and cancellation in both execution modes. Each failure releases the profile and does not replay a prompt; a subsequent explicitly submitted task can proceed. Existing queue integration tests cover deadlines, cancellation and worker restart recovery. These fault tests do not claim a live provider outage, a deliberately expired user session, or extended uptime.
+
+The package smoke test also exercises default Codex setup, idle-worker update and config-only uninstall while preserving another MCP server and saved data.
+
 ## Separate fixture coverage
 
 `pnpm check` covers page fixtures, cancellation, task persistence, profile lifecycle, config handling and the real Chromium engine fixture. `pnpm test:package` covers a clean npm install and MCP handshake without an account. Neither substitutes for the explicitly invoked live check above. No CI workflow is installed.

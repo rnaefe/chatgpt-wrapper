@@ -14,10 +14,12 @@ export async function runNode(
   script: string,
   args: string[],
   env = process.env,
+  cwd?: string,
 ) {
   await new Promise<void>((resolve, reject) => {
     const child = spawn(process.execPath, [script, ...args], {
       env,
+      cwd,
       stdio: "inherit",
       windowsHide: true,
     });
@@ -81,6 +83,7 @@ export async function installRuntime(
     "--ignore-scripts",
     "--no-audit",
     "--no-fund",
+    "--loglevel=error",
     "--",
     spec,
   ]);
@@ -107,5 +110,7 @@ export async function installBrowser(root: string) {
   await runNode(
     join(dirname(require.resolve("playwright/package.json")), "cli.js"),
     ["install", "chromium"],
+    process.env,
+    root,
   );
 }

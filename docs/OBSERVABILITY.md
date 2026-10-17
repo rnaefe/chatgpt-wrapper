@@ -31,4 +31,4 @@ Missing timestamps and invalid/negative durations are omitted. Empty distributio
 
 Error summaries group by stored error code. Recent errors include task ID, status, code and timestamps. They omit prompts, generated code, file attachments and error-message text. Use `get_task` explicitly to inspect a particular task's detailed failure. Private daemon and browser-verification logs remain in the data directory; there is no external telemetry or dashboard.
 
-These are Wrapper task metrics, not ChatGPT account quotas, provider latency telemetry or subscription-usage estimates. Retention management and automatic alerts are not implemented.
+These are Wrapper task metrics, not ChatGPT account quotas, provider latency telemetry or subscription-usage estimates. Metrics reflect retained task history: `TASK_RETENTION_DAYS` defaults to 30, and expired terminal tasks leave the totals after cleanup. Automatic alerts are not implemented.

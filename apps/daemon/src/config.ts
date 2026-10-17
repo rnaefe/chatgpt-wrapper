@@ -35,6 +35,15 @@ export function runtime() {
   const port = Number(process.env.PORT ?? DEFAULT_PORT);
   if (!Number.isInteger(port) || port < 1 || port > 65535)
     throw new Error("Invalid PORT");
+  const retentionDays = Number(process.env.TASK_RETENTION_DAYS ?? 30);
+  if (
+    !Number.isInteger(retentionDays) ||
+    retentionDays < 0 ||
+    retentionDays > 3650
+  )
+    throw new Error(
+      "TASK_RETENTION_DAYS must be an integer between 0 and 3650",
+    );
   const lockPath = join(directory, "daemon.lock");
   if (existsSync(lockPath)) {
     const pid = Number(readFileSync(lockPath, "utf8"));
@@ -72,7 +81,7 @@ export function runtime() {
   return {
     store,
     adapter,
-    worker: new Worker(store, adapter),
+    worker: new Worker(store, adapter, retentionDays),
     token,
     port,
     release,

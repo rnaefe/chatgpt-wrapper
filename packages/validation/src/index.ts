@@ -3,6 +3,16 @@ export const MAX_ARTIFACT_BYTES = 20 * 1024 * 1024;
 export function validateText(text: string, request: TaskRequest): string[] {
   if (!text.trim() && request.capability !== "image.generate")
     throw new Error("Provider returned an empty response");
+  if (request.capability === "code.generate") {
+    const code = text.match(/^(`{3,}|~{3,})[^\n]*\n([\s\S]*?)\n\1[ \t]*$/m);
+    const patch =
+      /^--- (?:a\/|\/dev\/null)/m.test(text) &&
+      /^\+\+\+ (?:b\/|\/dev\/null)/m.test(text);
+    if ((!code || !code[2].trim()) && !patch)
+      throw new Error(
+        "Code generation requires a nonempty fenced code block or unified diff",
+      );
+  }
   const checks = [
     ...(text.trim() ? ["nonempty text"] : ["text optional for image output"]),
     "output size bounded",

@@ -52,17 +52,8 @@ export function clientConfigPath(
     "Claude Desktop automatic configuration is supported on macOS and Windows. Use --config with an explicit JSON file on other systems.",
   );
 }
-export function configureClient(
-  client: ClientName,
-  entry: McpCommand | null,
-  options: {
-    path?: string;
-    replace?: boolean;
-    dryRun?: boolean;
-    managedDirectory?: string;
-  } = {},
-) {
-  const path = resolve(options.path ?? clientConfigPath(client));
+function readConfiguration(client: ClientName, explicitPath?: string) {
+  const path = resolve(explicitPath ?? clientConfigPath(client));
   if (existsSync(path) && !lstatSync(path).isFile())
     throw new Error(`Configuration must be a regular file: ${path}`);
   const original = existsSync(path) ? readFileSync(path, "utf8") : undefined;
@@ -83,6 +74,35 @@ export function configureClient(
   }
   const key = client === "codex" ? "mcp_servers" : "mcpServers";
   const servers = document[key] === undefined ? {} : record(document[key], key);
+  return { path, original, document, key, servers };
+}
+export function managedClientEntry(
+  client: ClientName,
+  path?: string,
+): McpCommand | undefined {
+  const value = readConfiguration(client, path).servers.wrapper as
+    McpCommand | undefined;
+  return value?.env &&
+    typeof value.env.DATA_DIR === "string" &&
+    isAbsolute(value.env.DATA_DIR) &&
+    isManagedEntry(value, value.env.DATA_DIR)
+    ? value
+    : undefined;
+}
+export function configureClient(
+  client: ClientName,
+  entry: McpCommand | null,
+  options: {
+    path?: string;
+    replace?: boolean;
+    dryRun?: boolean;
+    managedDirectory?: string;
+  } = {},
+) {
+  const { path, original, document, key, servers } = readConfiguration(
+    client,
+    options.path,
+  );
   if (servers.wrapper !== undefined) {
     if (JSON.stringify(servers.wrapper) === JSON.stringify(entry))
       return { path, changed: false };

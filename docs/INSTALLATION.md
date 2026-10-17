@@ -2,12 +2,12 @@
 
 ## Install
 
-Version `0.4.1` adds on-demand browser windows. Registry installation, persistent runtime setup, and the seven-tool MCP handshake were verified on macOS on 2026-10-17. The package name is `@rnaefe/chatgpt-wrapper`. The unscoped `chatgpt-wrapper` name belongs to an existing, different npm package.
+Version `0.4.2` adds default Codex setup, managed upgrades and uninstall. Registry installation, persistent runtime setup, and the seven-tool MCP handshake were verified on macOS on 2026-10-17. The package name is `@rnaefe/chatgpt-wrapper`. The unscoped `chatgpt-wrapper` name belongs to an existing, different npm package.
 
 Run:
 
 ```sh
-npx -y @rnaefe/chatgpt-wrapper@0.4.1 setup --client codex
+npx -y @rnaefe/chatgpt-wrapper@0.4.2
 ```
 
 Requires Node.js 24+ with npm and a desktop session for manual ChatGPT sign-in. No repository clone, pnpm, API key, or manual MCP JSON/TOML editing is needed by end users.
@@ -29,7 +29,7 @@ npm pack --ignore-scripts
 Then, from any directory, using the absolute tarball path:
 
 ```sh
-npx -y --package /absolute/path/rnaefe-chatgpt-wrapper-0.4.1.tgz chatgpt-wrapper setup --client codex --package /absolute/path/rnaefe-chatgpt-wrapper-0.4.1.tgz
+npx -y --package /absolute/path/rnaefe-chatgpt-wrapper-0.4.2.tgz chatgpt-wrapper setup --client codex --package /absolute/path/rnaefe-chatgpt-wrapper-0.4.2.tgz
 ```
 
 `--package` tells setup to install that tarball into its persistent runtime. Without it, setup installs the exact published name and version of the running CLI.
@@ -48,7 +48,7 @@ Supported setup targets:
 
 Use `--config /absolute/path` for an explicit configuration file. Claude Desktop's automatic path is supported on macOS and Windows; other systems require `--config`.
 
-Existing settings and other MCP servers are preserved as values. Config serialization can normalize formatting and remove comments. Every changed existing file gets an exact, private backup next to it. Invalid config files are not overwritten. An existing, different `wrapper` entry requires `--replace`; a matching entry is left untouched.
+Existing settings and other MCP servers are preserved as values. Config serialization can normalize formatting and remove comments. Every changed existing file gets an exact, private backup next to it. Invalid config files are not overwritten. An entry pointing to a versioned Wrapper runtime in the same data directory is upgraded automatically. An unrelated or differently scoped `wrapper` entry requires `--replace`; a matching entry is left untouched.
 
 Preview without installing, downloading, or writing:
 
@@ -60,10 +60,12 @@ Setup config formats follow the [Codex MCP documentation](https://learn.chatgpt.
 
 ## Commands and options
 
-- `setup --client codex`: persistent install, browser install, client configuration and login.
+- No command, or `setup`: install, configure Codex, and sign in. Other clients use `--client`.
+- `update`: install the running CLI version, stop the authenticated idle worker, and upgrade its managed client entry. Reuses the saved session without opening sign-in.
+- `uninstall`: stop the authenticated idle worker and remove only Wrapper from the selected client with an exact backup. Saved profiles, history, logs and runtime files are preserved.
 - `setup --skip-login`: configure now, sign in later. Prints the exact installed command.
 - `setup --replace`: update an existing Wrapper entry after backing up the config.
-- `connect`: install Chromium if missing and open the login flow.
+- `connect`: install Chromium if missing and sign in if needed. A ready worker skips the window; concurrent calls join existing sign-in. `--force-login` explicitly opens sign-in again.
 - `mcp`: stdio MCP server; stdout is reserved for protocol messages.
 - `stop`: stop an authenticated idle worker and close its browser, keeping saved data. Refuses unfinished tasks or a mismatched PID.
 - `verify-browser --mode both`: explicitly run live probes; see [browser reliability](BROWSER_RELIABILITY.md).
@@ -83,9 +85,21 @@ Profiles, tokens, task databases, and logs live outside the package and survive 
 
 ## Updating and removing
 
-After publishing a new version, run its setup command with `--replace`. Each version gets its own runtime directory; user data remains shared. Run the old runtime's `stop` command while its queue is idle, then restart the MCP client to use the new runtime. Automatic migration of running workers is not implemented.
+Run:
 
-To disconnect, remove only `wrapper` from the client's MCP configuration, or restore the saved backup when no subsequent config changes need preserving. Stop the Wrapper worker before removing its application-data directory. Removing that directory deletes the saved sign-in and task history. An automatic uninstall command is not implemented.
+```sh
+npx -y @rnaefe/chatgpt-wrapper@latest update
+```
+
+Select the same `--client` and `--config` for a custom installation. Managed entries supply their saved data directory, port, mode, and additional environment settings automatically; explicit flags override them. Setup and update recognize versioned runtimes for the same data directory and back up config changes. Other entries still require `--replace`. New runtime and browser installation finish before an idle worker is stopped. Active or queued work blocks migration. Restart the MCP client afterwards; the next task checks the saved session. If it expired, run `connect`.
+
+To disconnect:
+
+```sh
+npx -y @rnaefe/chatgpt-wrapper@latest uninstall
+```
+
+Uninstall removes only the selected client's Wrapper entry and stops its idle worker. Other client settings remain. The exact config backup, saved profile, history, logs and installed runtimes remain on disk. If other clients use Wrapper, their next request can start it again. To erase personal data, first remove Wrapper from all clients and stop the worker, then remove the printed data directory. Uninstall does not silently erase user data or shared browser downloads.
 
 ## Maintainer release checks
 

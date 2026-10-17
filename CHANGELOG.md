@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.2 — 2026-10-17
+
+- Default to Codex setup, including when no command is supplied.
+- Upgrade recognized managed MCP entries without a replacement flag; stop only idle workers.
+- Add `update` and `uninstall`, preserving other MCP entries and saved user data.
+- Skip repeated sign-in for a ready worker and join sign-in already in progress.
+- Reuse installed runtime files and keep Chromium installation output focused.
+- Cover session expiry, interruptions, window closure, cancellation and recovery without prompt replay.
+- Integrate image input boundaries, binary MCP images, output validation and task retention from upstream.
+
 ## 0.4.1 — 2026-10-17
 
 - Close the visible browser after sign-in and after each task; reopen the saved profile on demand.

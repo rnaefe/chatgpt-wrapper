@@ -2,21 +2,23 @@
 
 A local MCP server that sends coding and analysis tasks to ChatGPT through a visible Playwright browser and returns completed responses as Markdown.
 
-**Experimental.** The default is a visible browser with manual sign-in and verification. A live MCP code task completed using the same visible session on 2026-10-17. Headless mode remains optional and currently encounters provider browser verification.
+**Experimental.** Initial sign-in is visible; subsequent tasks run headlessly by default. Headless execution may encounter provider browser verification. A live MCP code task completed in visible mode on 2026-10-17. Set `BROWSER_HEADLESS=false` for visible tasks if headless execution is blocked; do not attempt to bypass browser verification.
 
 ## Install through the CLI
 
-Install version `0.4.1` from npm and configure Codex:
+Install version `0.4.2` from npm and configure Codex:
 
 ```sh
-npx -y @rnaefe/chatgpt-wrapper@0.4.1 setup --client codex
+npx -y @rnaefe/chatgpt-wrapper@0.4.2
 ```
 
 Requires Node.js 24+ and npm. Setup installs Chromium, adds Wrapper to your MCP client, and opens ChatGPT for manual sign-in. Restart your MCP client after setup. The browser closes after sign-in and opens only while a task runs. No repository clone or config editing is needed.
 
-Codex is the primary setup target. `--client cursor` and `--client claude-desktop` are also supported. Existing settings are backed up; replacing an existing Wrapper entry requires `--replace`.
+Codex is the primary setup target. `--client cursor` and `--client claude-desktop` are also supported. Existing settings are backed up. Wrapper recognizes and upgrades its own runtime entry; replacing an unrelated entry requires `--replace`.
 
 See the [installation guide and local tarball testing](docs/INSTALLATION.md). The unscoped npm name `chatgpt-wrapper` belongs to another package.
+
+To upgrade, run `npx -y @rnaefe/chatgpt-wrapper@latest update`, then restart your MCP client. The update stops an idle worker and preserves the saved session. `uninstall` removes the selected client entry with a backup and preserves local data.
 
 For development from this repository:
 
@@ -43,7 +45,7 @@ Submit a task and poll its ID with `get_task`. Wrapper returns completed respons
 
 ## Local configuration
 
-No `.env` is required. Packaged installations store data in the OS application-data directory; development uses `.data`. Optional settings: `DATA_DIR`, `PORT` (default 11435), and `BROWSER_HEADLESS=true` to opt into experimental headless execution. Authentication lives in a separate private profile under `.data/playwright-profile`; it is never imported from your everyday browser or exported. Keep this directory private.
+No `.env` is required. Packaged installations store data in the OS application-data directory; development uses `.data`. Optional settings: `DATA_DIR`, `PORT` (default 11435), and `BROWSER_HEADLESS=true` to opt into experimental headless execution. Image inputs require explicit `IMAGE_INPUT_ROOTS` directories or `ALLOWED_IMAGE_HOSTS` HTTPS hosts. Terminal task history expires after `TASK_RETENTION_DAYS` (default 30; 0 disables expiry). Authentication lives in a separate private profile under `.data/playwright-profile`; it is never imported from your everyday browser or exported. Keep this directory private.
 
 The worker uses an authenticated loopback transport internally so MCP clients share one SQLite queue. One task runs at a time; sign-in pauses task dispatch. Interrupted or ambiguous submissions are never replayed automatically.
 
@@ -69,7 +71,7 @@ Tests cover the durable queue, MCP, cancellation, browser lifecycle, onboarding,
 | `BROWSER_START_FAILED` | Install Chromium and close another process using the same Wrapper profile                                                                                                   |
 | `WORKER_RESTARTED`     | Review the previous task before submitting a new one; it was not replayed                                                                                                   |
 
-Runtime data stays on disk until you remove it. Stop the worker before deleting its data directory; deleting the profile requires a new sign-in.
+Terminal task history and unreferenced artifacts are pruned after the configured retention period. Browser credentials, logs and other runtime files remain until manually deleted. Stop the worker before deleting its data directory; deleting the profile requires a new sign-in. Image artifacts returned by `get_artifact` use standard MCP base64 image content; large artifacts may require authenticated HTTP retrieval.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development and [installation guide](docs/INSTALLATION.md) for credential handling. Licensed under the [GNU GPL v3](LICENSE).
 

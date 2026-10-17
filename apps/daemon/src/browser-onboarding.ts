@@ -25,7 +25,7 @@ export async function inspectReadiness(
       error: {
         code: "LOGIN_REDIRECT",
         message:
-          "The browser redirected to sign-in. Run pnpm connect to sign in again.",
+          "The browser redirected to sign-in. Run chatgpt-wrapper connect to sign in again.",
         status: "NEEDS_AUTH",
       },
     };
@@ -69,7 +69,7 @@ export async function waitForSignIn(
       if (closed)
         throw new ProviderError(
           "LOGIN_CANCELLED",
-          "Sign-in window closed. Run pnpm connect to try again.",
+          "Sign-in window closed. Run chatgpt-wrapper connect to try again.",
           "NEEDS_AUTH",
         );
       let ready = false;
@@ -91,7 +91,7 @@ export async function waitForSignIn(
     }
     throw new ProviderError(
       "LOGIN_TIMEOUT",
-      "Sign-in timed out. Run pnpm connect to try again.",
+      "Sign-in timed out. Run chatgpt-wrapper connect to try again.",
       "NEEDS_AUTH",
     );
   } finally {

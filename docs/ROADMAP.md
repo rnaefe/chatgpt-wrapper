@@ -10,13 +10,15 @@ Verified locally: clean tarball installation, preservation of unrelated Codex se
 
 Visible execution has previously completed a live MCP coding task. Headless execution has encountered a provider browser-verification screen. Package smoke tests do not access an account or claim to verify provider reliability.
 
-Implemented: an explicitly invoked, sequential live MCP verification command and private outcome reports. On 2026-10-17, two visible probes passed; headless was blocked by browser verification before submission. See BROWSER_RELIABILITY.md. Cross-platform and extended-session acceptance remain unverified.
+Implemented: an explicitly invoked, sequential live MCP verification command and private outcome reports. On 2026-10-17, two visible probes passed; headless was blocked by browser verification before submission. See BROWSER_RELIABILITY.md. Cross-platform and extended-session acceptance remain unverified. Fault recovery is tested with controlled fixtures, without signing the user out or deliberately disrupting their network.
 
 ## 3. Observability
 
-Implemented: authenticated CLI/HTTP/MCP queries for duration distributions, success rate, outcome counts and recent error codes. Prompts and responses are excluded from metrics. See OBSERVABILITY.md for definitions. Retention controls and alerts remain unimplemented.
+Implemented: authenticated CLI/HTTP/MCP queries for duration distributions, success rate, outcome counts and recent error codes. Prompts and responses are excluded from metrics. See OBSERVABILITY.md for definitions. Terminal-task retention defaults to 30 days and is configurable. Alerts remain unimplemented.
 
 ## 4. Release
+
+Version 0.4.2 adds default Codex onboarding, managed updates and uninstall. Fixture tests cover expired sessions, interrupted evaluation, window closure and recovery without replay. Platform acceptance remains excluded from this work.
 
 Version 0.4.1 is public on npm with on-demand browser windows. Its registry integrity matched the release artifact; clean registry installation, Codex config merge and the seven-tool MCP handshake passed on macOS.
 

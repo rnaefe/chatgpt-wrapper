@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join, dirname, delimiter, resolve } from "node:path";
 import { createServer } from "node:net";
 import assert from "node:assert/strict";
-import { parse } from "smol-toml";
+import { parse, stringify } from "smol-toml";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 const exec = promisify(execFile);
@@ -122,7 +122,6 @@ try {
     'model = "test-model"\n[mcp_servers.other]\ncommand = "other-tool"\n';
   await writeFile(config, original);
   await node(initialCli, [
-    "setup",
     "--config",
     config,
     "--data-dir",
@@ -138,6 +137,8 @@ try {
   const entry = document.mcp_servers.wrapper;
   assert(entry.args[0].startsWith(directory));
   assert.equal(entry.env.BROWSER_HEADLESS, "false");
+  entry.env.TASK_RETENTION_DAYS = "0";
+  await writeFile(config, stringify(document));
   // Prove the client is independent of npx's temporary bootstrap package.
   await rm(bootstrap, { recursive: true, force: true });
   client = new Client({ name: "packaged-smoke-test", version: "1" });
@@ -170,10 +171,6 @@ try {
     "update",
     "--config",
     config,
-    "--data-dir",
-    directory,
-    "--port",
-    String(port),
     ...(registry ? [] : ["--package", tarball]),
   ]);
   assert(
@@ -183,15 +180,9 @@ try {
   const updated = parse(await readFile(config, "utf8"));
   assert.equal(updated.mcp_servers.other.command, "other-tool");
   assert.equal(updated.mcp_servers.wrapper.env.DATA_DIR, directory);
-  const removed = await node(entry.args[0], [
-    "uninstall",
-    "--config",
-    config,
-    "--data-dir",
-    directory,
-    "--port",
-    String(port),
-  ]);
+  assert.equal(updated.mcp_servers.wrapper.env.PORT, String(port));
+  assert.equal(updated.mcp_servers.wrapper.env.TASK_RETENTION_DAYS, "0");
+  const removed = await node(entry.args[0], ["uninstall", "--config", config]);
   assert(removed.stdout.includes("removed from"));
   const final = parse(await readFile(config, "utf8"));
   assert.equal(final.mcp_servers.wrapper, undefined);
