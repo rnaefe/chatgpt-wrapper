@@ -14,12 +14,12 @@ import {
   Workflow,
   ImageResult,
   Capabilities,
-  Speed,
+  Install,
   Outro,
 } from "./scenes";
 import { duration, fps, scenes } from "./constants";
 
-const parts = [Intro, Workflow, Code, ImageResult, Capabilities, Speed, Outro];
+const parts = [Intro, Workflow, Code, ImageResult, Capabilities, Install, Outro];
 function Demo({ reducedMotion = false }: { reducedMotion?: boolean }) {
   return (
     <Calm.Provider value={reducedMotion}>
