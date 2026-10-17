@@ -5,6 +5,7 @@ import {
   readFileSync,
   writeFileSync,
   existsSync,
+  rmSync,
 } from "node:fs";
 import { join } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
@@ -237,6 +238,53 @@ export class Store {
       throw new Error("Artifact integrity check failed");
     return data;
   }
+  /** Remove old terminal tasks and only artifacts no remaining task references. */
+  pruneOlderThan(cutoff: Date): { tasks: number; artifacts: number } {
+    if (!Number.isFinite(cutoff.getTime()))
+      throw new Error("Invalid retention cutoff");
+    const rows = this.db
+      .prepare("SELECT id,body FROM tasks WHERE status IN (" +
+        terminalStatuses.map(() => "?").join(",") + ")")
+      .all(...terminalStatuses);
+    const expired = rows.filter((row) => {
+      const task = JSON.parse(String(row.body)) as Task;
+      return task.finishedAt && task.finishedAt < cutoff.toISOString();
+    });
+    if (!expired.length) return { tasks: 0, artifacts: 0 };
+    const orphanIds: string[] = [];
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const deleteEvents = this.db.prepare("DELETE FROM events WHERE task_id=?");
+      const deleteTask = this.db.prepare("DELETE FROM tasks WHERE id=?");
+      for (const row of expired) {
+        deleteEvents.run(row.id);
+        deleteTask.run(row.id);
+      }
+      const referenced = new Set<string>();
+      for (const row of this.db.prepare("SELECT body FROM tasks").all()) {
+        const task = JSON.parse(String(row.body)) as Task;
+        for (const artifact of task.result?.artifacts ?? [])
+          referenced.add(artifact.id);
+      }
+      const deleteArtifact = this.db.prepare("DELETE FROM artifacts WHERE id=?");
+      for (const row of this.db.prepare("SELECT id FROM artifacts").all()) {
+        const id = String(row.id);
+        if (!referenced.has(id) && ARTIFACT_ID_PATTERN.test(id)) {
+          deleteArtifact.run(id);
+          orphanIds.push(id);
+        }
+      }
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    // Metadata commits first; a failed file deletion leaves only a harmless orphan file.
+    for (const id of orphanIds)
+      rmSync(join(this.directory, "artifacts", id), { force: true });
+    return { tasks: expired.length, artifacts: orphanIds.length };
+  }
+
   close() {
     this.db.close();
   }
