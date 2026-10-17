@@ -17,14 +17,14 @@ export async function connectBrowser(force = false) {
       `The worker is running in ${status.browserAdapter.mode} mode. Run chatgpt-wrapper stop, then reconnect with --${expectedMode}.`,
     );
   if (status.browserAdapter.state === "READY" && !force) {
-    console.log("ChatGPT is already connected. Ready for MCP tasks.");
+    console.log("✓ ChatGPT connected (saved session)");
     return;
   }
   if (
     !["SIGNING_IN", "VERIFYING"].includes(status.browserAdapter.state ?? "")
   ) {
     console.log(
-      "Opening ChatGPT. Sign in once; setup finishes automatically and closes the window.",
+      "→ Sign in to ChatGPT in the window that opens.\n  Setup continues automatically; the window will close.",
     );
     await request("/v1/browser/connect", {});
   } else {
@@ -39,13 +39,12 @@ export async function connectBrowser(force = false) {
     };
     const { state, message } = result.browserAdapter;
     if (state !== previous) {
-      console.log(message ?? state);
+      if (state !== "READY" && state !== "SIGNING_IN")
+        console.log(message ?? state);
       previous = state;
     }
     if (state === "READY") {
-      console.log(
-        "Ready. Use Wrapper from your MCP client. You can close this terminal.",
-      );
+      console.log("✓ ChatGPT connected. Browser closed; saved session ready.");
       break;
     }
     if (!["SIGNING_IN", "VERIFYING"].includes(state)) {

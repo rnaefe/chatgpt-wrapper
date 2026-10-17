@@ -15,7 +15,14 @@ const metadata = JSON.parse(await readFile("package.json", "utf8"));
 const registry = process.argv.includes("--registry");
 const spec = `${metadata.name}@${metadata.version}`;
 const temp = await mkdtemp(join(tmpdir(), "wrapper package test-"));
-const env = { ...process.env, HOME: join(temp, "home") };
+const env = {
+  ...process.env,
+  HOME: join(temp, "home"),
+  // Share only browser binaries between package tests, never a user profile.
+  PLAYWRIGHT_BROWSERS_PATH:
+    process.env.PLAYWRIGHT_BROWSERS_PATH ??
+    join(root, "node_modules/.cache/wrapper-package-browsers"),
+};
 for (const key of [
   "DATA_DIR",
   "PORT",
@@ -44,7 +51,7 @@ async function node(script, args = []) {
     env,
     cwd: temp,
     maxBuffer: 4 * 1024 * 1024,
-    timeout: 180000,
+    timeout: 420000,
   });
 }
 try {
@@ -167,6 +174,7 @@ try {
   assert.deepEqual(JSON.parse(errors.content[0].text).errors, []);
   await client.close();
   client = undefined;
+  const oldWorkerPid = await readFile(join(directory, "daemon.lock"), "utf8");
   await node(entry.args[0], [
     "update",
     "--config",
@@ -174,8 +182,8 @@ try {
     ...(registry ? [] : ["--package", tarball]),
   ]);
   assert(
-    !existsSync(join(directory, "daemon.lock")),
-    "Update must stop the idle old worker",
+    (await readFile(join(directory, "daemon.lock"), "utf8")) !== oldWorkerPid,
+    "Update must replace the idle old worker and verify the new one",
   );
   const updated = parse(await readFile(config, "utf8"));
   assert.equal(updated.mcp_servers.other.command, "other-tool");

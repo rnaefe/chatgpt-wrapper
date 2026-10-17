@@ -57,6 +57,10 @@ Keep the change focused. Explain the problem, resulting behavior and verificatio
 
 Use [private reporting](SECURITY.md) for vulnerabilities.
 
+## Demo video
+
+The separate `video/` package renders the README demo from captured public CLI/MCP output. It is not part of the runtime or npm distribution. See [video instructions](video/README.md) before capturing; a live capture sends a provider prompt, while rendering the existing transcript does not.
+
 ## Prepare a release
 
 Update the root package version, changelog and installation examples. Internal workspace packages are bundled into the distribution; they are not published separately. Keep claims about browser support tied to recorded evidence.

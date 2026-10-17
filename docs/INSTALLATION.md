@@ -12,6 +12,8 @@ npx -y @rnaefe/chatgpt-wrapper@0.4.2
 
 Requires Node.js 24+ with npm and a desktop session for manual ChatGPT sign-in. No repository clone, pnpm, API key, or manual MCP JSON/TOML editing is needed by end users.
 
+The development CLI also checks the installed MCP connection before declaring setup complete; this progress display is an unreleased improvement. The [demo source](../video/README.md) records the exact scope.
+
 Setup installs a versioned runtime in the user's application-data directory, installs Playwright Chromium, configures the selected client, and opens the sign-in flow. MCP points to that persistent runtime, not the temporary `npx` cache. Restart the MCP client after setup.
 
 Visible browser mode is selected during setup. Complete login or browser verification yourself. The window closes after sign-in; each task opens the saved profile and closes its window when finished. `--headless` is experimental and may encounter provider verification. Nothing automatically solves or bypasses verification.

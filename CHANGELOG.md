@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Guide setup through concise progress steps and verify the installed MCP connection before declaring completion.
+
 - Add MCP usage and troubleshooting guides, contributor package map and GitHub reporting templates.
 - Refuse automatic replacement of malformed or relative runtime entries.
 - Correct README browser defaults and add package discovery/license metadata.

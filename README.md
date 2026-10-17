@@ -4,6 +4,19 @@ Use your ChatGPT browser session from an MCP coding client. Wrapper queues a tas
 
 [Install](docs/INSTALLATION.md) · [npm](https://www.npmjs.com/package/@rnaefe/chatgpt-wrapper) · [Releases](https://github.com/rnaefe/chatgpt-wrapper/releases) · [Contribute](CONTRIBUTING.md)
 
+[![Watch the onboarding demo](docs/assets/wrapper-demo.png)](docs/assets/wrapper-demo.mp4)
+
+**[Watch the 38-second demo](docs/assets/wrapper-demo.mp4)** · [Captions](docs/assets/captions.vtt) · [Video source](video/README.md)
+
+Actual development-build CLI output and a live MCP result, rendered as a video. Uses a saved session; first-login UI is not recorded. Local paths and waiting are shortened. The CLI presentation previews unreleased changes.
+
+<details>
+<summary>Play the animated preview</summary>
+
+![Animated walkthrough of setup, saved-session connection and a completed MCP task](docs/assets/wrapper-demo.gif)
+
+</details>
+
 An unofficial, experimental project. Requires your own ChatGPT account; no OpenAI API key. Provider UI changes, verification prompts and account limits can interrupt tasks.
 
 ## Start with Codex

@@ -181,11 +181,14 @@ async function main() {
       console.log(JSON.stringify({ client, ...preview, entry }, null, 2));
       return;
     }
-    console.log(
-      `Installing ${packageMetadata.name}@${packageMetadata.version} into ${directory}`,
-    );
+    console.log(`\nChatGPT Wrapper ${packageMetadata.version}\n`);
+    console.log(`✓ ${client} configuration checked`);
+    console.log("→ Installing the local runtime");
     const installed = await installRuntime(directory, values.package);
+    console.log("✓ Runtime installed");
+    console.log("→ Checking Chromium");
     await installBrowser(installed.root);
+    console.log("✓ Browser ready");
     const { stopWorker } = await import("./worker-control.js");
     if (
       (preview.changed || command === "update") &&
@@ -202,18 +205,25 @@ async function main() {
       },
     );
     console.log(
-      `MCP ${changed.changed ? "configured" : "already configured"}: ${changed.path}`,
+      `✓ ${client} ${changed.changed ? "configured" : "already configured"}`,
     );
     if (changed.backup) console.log(`Backup: ${changed.backup}`);
-    console.log(
-      `Restart ${client} to load Wrapper. No tokens or API keys are needed in its configuration.`,
-    );
+    const { checkMcp } = await import("./mcp-check.js");
+    const toolCount = await checkMcp({
+      ...entry,
+      args: [installed.cli, "mcp"],
+    });
+    console.log(`✓ MCP connection verified (${toolCount} tools)`);
     if (!values["skip-login"] && command !== "update")
       await runNode(installed.cli, ["connect"], { ...process.env, ...env });
     else
       console.log(
         `${command === "update" ? "Update ready. Saved session will be checked on the next task. Reconnect if requested" : "Sign in later"}: ${JSON.stringify(process.execPath)} ${JSON.stringify(installed.cli)} connect --data-dir ${JSON.stringify(directory)} --port ${port}${values.headless ? " --headless" : ""}`,
       );
+    console.log(`\nReady. Restart ${client}, then try:`);
+    console.log(
+      '"Use Wrapper to write a TypeScript clamp function with an example."',
+    );
     return;
   }
   loadEnvironment();

@@ -1,0 +1,26 @@
+{
+  "capturedAt": "2026-10-17T17:23:27.263Z",
+  "disclosure": "Actual development-build CLI output and a live MCP result. Saved ChatGPT session; no first-login recording. Install chatter and local paths omitted. Idle time shortened.",
+  "setup": [
+    "ChatGPT Wrapper 0.4.2",
+    "✓ codex configuration checked",
+    "→ Installing the local runtime",
+    "✓ Runtime installed",
+    "→ Checking Chromium",
+    "✓ Browser ready",
+    "✓ codex configured",
+    "✓ MCP connection verified (7 tools)",
+    "Ready. Restart codex, then try:",
+    "\"Use Wrapper to write a TypeScript clamp function with an example.\""
+  ],
+  "connect": ["✓ ChatGPT connected (saved session)"],
+  "task": [
+    "→ Public TypeScript task submitted",
+    "✓ COMPLETED in 10.6s",
+    "```typescript",
+    "export const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));",
+    "```",
+    "✓ Exact requested source verified"
+  ],
+  "seconds": "10.6"
+}
