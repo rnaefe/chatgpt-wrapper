@@ -19,39 +19,39 @@ export function Intro() {
   return (
     <Stage
       index={1}
-      title="Your toolchain"
+      title="Why I built it"
       seconds={4}
-      note="Independent, experimental project. Uses your own ChatGPT account."
+      note="A literal browser wrapper, not an official ChatGPT API integration."
     >
       <Rise style={{ marginTop: 125 }}>
-        <Tag>ChatGPT, through MCP.</Tag>
+        <Tag>I hit my Codex usage limit.</Tag>
       </Rise>
       <Rise delay={3}>
-        <Headline size={146}>
-          YOUR CHATGPT.
+        <Headline size={144}>
+          SO I WRAPPED
           <br />
-          <span style={{ color: c.accent }}>IN YOUR TOOLCHAIN.</span>
+          <span style={{ color: c.accent }}>CHATGPT.</span>
         </Headline>
       </Rise>
       <Rise delay={6}>
         <p
           style={{
-            fontSize: 30,
+            fontSize: 32,
             color: c.muted,
-            maxWidth: 1200,
+            maxWidth: 1260,
             lineHeight: 1.4,
           }}
         >
-          Send work from your coding client.
+          Literally. Playwright for the browser.
           <br />
-          Get code, analysis and images back.
+          MCP for the coding tools.
         </p>
       </Rise>
       <div
         style={{
           position: "absolute",
-          right: 40,
-          top: 105,
+          right: 48,
+          top: 112,
           fontFamily: mono,
           fontSize: 160,
           color: c.accent,
@@ -369,44 +369,57 @@ export function Capabilities() {
     </Stage>
   );
 }
-export function Speed() {
+export function Install() {
   return (
     <Stage
       index={6}
-      title="Measured locally"
+      title="One-command setup"
       seconds={6}
       light
-      note="12 sequential local-fixture tasks. Median queue + validation + persistence. Excludes browser/provider time."
+      note="Requires Node.js 24+, npm, your own ChatGPT account and manual sign-in."
     >
-      <Rise style={{ marginTop: 80 }}>
-        <Tag light>Wake on work. Stop polling the queue.</Tag>
-        <Headline size={98}>
-          Less waiting
+      <Rise style={{ marginTop: 74 }}>
+        <Tag light>From terminal to MCP client</Tag>
+        <Headline size={104}>
+          ONE COMMAND.
           <br />
-          before work starts.
+          <span style={{ opacity: 0.75 }}>YOUR OWN SESSION.</span>
         </Headline>
       </Rise>
       <Rise delay={3}>
         <div
           style={{
-            display: "flex",
-            alignItems: "baseline",
-            gap: 65,
-            marginTop: 55,
+            background: c.background,
+            borderRadius: 20,
+            border: "2px solid #59772f",
+            padding: "41px 48px",
+            marginTop: 24,
+            fontFamily: mono,
+            fontSize: 37,
+            color: c.text,
+            letterSpacing: -1,
           }}
         >
-          <div style={{ fontSize: 115, color: "#617b37", letterSpacing: -7 }}>
-            244<span style={{ fontSize: 45, letterSpacing: -2 }}> ms</span>
-          </div>
-          <span style={{ fontSize: 90 }}>→</span>
-          <div style={{ fontSize: 200, fontWeight: 700, letterSpacing: -13 }}>
-            1.7<span style={{ fontSize: 55, letterSpacing: -2 }}> ms</span>
-          </div>
+          <span style={{ color: c.accent }}>$ </span>
+          npx -y @rnaefe/chatgpt-wrapper@0.4.2
         </div>
       </Rise>
-      <Rise delay={6}>
-        <div style={{ fontFamily: mono, fontSize: 25, marginTop: 24 }}>
-          Event-driven queue · wait_task · indexed event history
+      <Rise delay={8}>
+        <div
+          style={{
+            display: "flex",
+            gap: 65,
+            marginTop: 55,
+            fontFamily: mono,
+            fontSize: 28,
+            fontWeight: 500,
+          }}
+        >
+          <span>01 / Install</span>
+          <span>→</span>
+          <span>02 / Sign in</span>
+          <span>→</span>
+          <span>03 / Use from Codex</span>
         </div>
       </Rise>
     </Stage>
@@ -416,32 +429,25 @@ export function Outro() {
   return (
     <Stage
       index={7}
-      title="Build from source"
+      title="Open source"
       seconds={4}
-      note="Node.js 24+ · Manual sign-in · Provider verification can interrupt work."
+      note="Unofficial and experimental. Provider UI and verification can interrupt tasks."
     >
-      <Rise style={{ marginTop: 120 }}>
-        <Tag>Open source. Local worker. Your session.</Tag>
+      <Rise style={{ marginTop: 118 }}>
+        <Tag>Open source · GPLv3</Tag>
         <Headline size={138}>
-          PUT WRAPPER
+          TRY IT.
           <br />
-          <span style={{ color: c.accent }}>TO WORK.</span>
+          <span style={{ color: c.accent }}>BREAK IT. FIX IT.</span>
         </Headline>
       </Rise>
       <Rise delay={3}>
-        <div style={{ fontFamily: mono, fontSize: 36, marginTop: 35 }}>
+        <div style={{ fontFamily: mono, fontSize: 38, marginTop: 36 }}>
           github.com/rnaefe/chatgpt-wrapper ↗
         </div>
-        <div
-          style={{
-            fontFamily: mono,
-            fontSize: 24,
-            color: c.muted,
-            marginTop: 30,
-          }}
-        >
-          Clone → pnpm install → pnpm build → pnpm connect
-        </div>
+        <p style={{ fontSize: 25, color: c.muted, marginTop: 30 }}>
+          Contributions and feedback welcome.
+        </p>
       </Rise>
     </Stage>
   );
