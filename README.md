@@ -1,43 +1,34 @@
 # ChatGPT Wrapper
 
-Use your ChatGPT browser session from an MCP coding client. Wrapper queues a task, runs it in ChatGPT, and returns the response with code blocks intact.
+**I ran out of Codex usage, so I literally wrapped ChatGPT.**
 
-[Install](docs/INSTALLATION.md) · [npm](https://www.npmjs.com/package/@rnaefe/chatgpt-wrapper) · [Releases](https://github.com/rnaefe/chatgpt-wrapper/releases) · [Contribute](CONTRIBUTING.md)
+A local MCP server that connects coding agents to your own ChatGPT browser session. It queues tasks, uses Playwright to run them in the browser, and sends code, analysis, and artifacts back to your MCP client.
 
-[![Watch the product demo with music](docs/assets/wrapper-demo.png)](docs/assets/wrapper-demo.mp4)
+[![Watch the 40-second ChatGPT Wrapper demo](docs/assets/wrapper-demo.gif)](docs/assets/wrapper-demo.mp4)
 
-**[Watch the 40-second demo with music](docs/assets/wrapper-demo.mp4)** · [Captions](docs/assets/captions.vtt) · [Video source](video/README.md)
+**[Watch the full 40-second demo](docs/assets/wrapper-demo.mp4)** · [Install guide](docs/INSTALLATION.md) · [npm package](https://www.npmjs.com/package/@rnaefe/chatgpt-wrapper) · [How it works](#how-it-works) · [Source of the demo](video/README.md)
 
-A 1080p product film with an original electronic score, actual captured code output, a Wrapper-generated image and a local queue benchmark. Designed scenes show the development workflow; this is an edited presentation, not an uncut screen recording. [Evidence and rendering details](video/README.md).
+The video is an edited product presentation using real captured outputs, not an uncut browser recording. [What's real, what's illustrated](video/README.md#evidence-behind-the-film).
 
-<details>
-<summary>Play the animated preview</summary>
+## Try it
 
-![Four-second animated preview of the Wrapper product film](docs/assets/wrapper-demo.gif)
+**Node.js 24+ · npm · a desktop browser session.** The released installer targets Codex by default.
 
-</details>
-
-An unofficial, experimental project. Requires your own ChatGPT account; no OpenAI API key. Provider UI changes, verification prompts and account limits can interrupt tasks.
-
-## Start with Codex
-
-Requires **Node.js 24+**, npm and a desktop session.
-
-```sh
+```bash
 npx -y @rnaefe/chatgpt-wrapper@0.4.2
 ```
 
-1. Setup installs Chromium and adds Wrapper to your Codex configuration, with a backup.
-2. Sign in to ChatGPT in the window that opens. Wrapper detects the session and closes the window.
-3. Restart Codex, then ask it to use Wrapper for a task.
+1. The CLI installs Chromium and configures Codex, backing up existing configuration.
+2. Sign in to ChatGPT manually in the browser window. Your session stays in a separate, private profile.
+3. Restart Codex and ask it to use Wrapper for a task:
 
-For example:
+> Use Wrapper to generate a TypeScript LRU cache with a usage example. Wait for the task to complete, then show the result.
 
-> Use Wrapper to generate a TypeScript LRU cache with a usage example. Use wait_task until it finishes, then show me the result.
+The browser opens for tasks and closes afterward. Wrapper returns generated results for review; it **doesn't run generated code or modify your repository**.
 
-The browser opens while each task runs and closes afterwards. Your saved session is reused. Generated code is returned for review; Wrapper does not execute commands or modify your repository.
+Using Cursor or Claude Desktop? See [client setup options](docs/INSTALLATION.md#client-configuration).
 
-For another client, run `setup --client cursor` or `setup --client claude-desktop`. For custom paths, existing installations and removal, see the [installation guide](docs/INSTALLATION.md).
+**Unofficial and experimental.** Uses your own ChatGPT account, not the OpenAI API. Browser verification, UI changes and provider account limits may interrupt tasks. No verification bypass or automatic prompt replay; review your provider's terms before use.
 
 ## Everyday commands
 
@@ -82,17 +73,17 @@ One worker processes one task at a time. Clients share the authenticated loopbac
 | `get_metrics`  | Inspect success rates and task durations       |
 | `list_errors`  | Inspect recent task IDs and error codes        |
 
-Tasks support code generation, code review, reasoning, image generation, image analysis and image editing. Analysis and editing require input images. Image results include local files and Markdown links for chat delivery.
+The development source supports code generation, review, reasoning, image generation, image analysis and image editing. Analysis and editing require input images. Newer development features are not necessarily available in the published v0.4.2 npm package.
 
 See the [MCP usage guide](docs/MCP.md) for request examples and status handling. Local queue measurements and their limits are documented in [performance](docs/PERFORMANCE.md).
 
-## Development improvements
+## Development source capabilities
 
-The working source adds image analysis/editing, long-poll task waiting, chat-ready image exports and task-specific prompt contracts. Prompts preserve objectives and constraints in JSON, request the appropriate deliverable for each capability, and distinguish evidence from assumptions. Prompt wording is not a security boundary or a substitute for reviewing results.
+The repository's working source adds image analysis/editing, long-poll task waiting, chat-ready image exports and task-specific prompt contracts beyond the published v0.4.2 release. Prompts preserve objectives and constraints in JSON, request the appropriate deliverable for each capability, and distinguish evidence from assumptions. Prompt wording is not a security boundary or a substitute for reviewing results.
 
 ## What is verified
 
-On macOS, the 0.4.2 release passed 76 tests, a clean npm installation, Codex config preservation, a seven-tool MCP handshake, update and uninstall checks. Two live visible coding probes completed in 10.0 and 11.0 seconds. These are individual test results, not an uptime guarantee.
+The published v0.4.2 package was checked with a clean npm installation, Codex config preservation, a seven-tool MCP handshake, and update/uninstall tests. Live visible coding tasks completed through MCP on macOS. These individual tests aren't an uptime guarantee.
 
 **Visible mode is the default.** Experimental headless mode encountered ChatGPT browser verification in the recorded test. Initial sign-in and verification remain manual. There is no challenge bypass or automatic prompt retry. Windows/Linux acceptance and long-session reliability remain unverified; image tasks were not part of the live coding checks. See [browser reliability](docs/BROWSER_RELIABILITY.md) for the evidence and repeatable checks.
 
