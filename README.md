@@ -8,7 +8,7 @@ Use your ChatGPT browser session from an MCP coding client. Wrapper queues a tas
 
 **[Watch the 40-second demo with music](docs/assets/wrapper-demo.mp4)** · [Captions](docs/assets/captions.vtt) · [Video source](video/README.md)
 
-A 1080p product film with an original electronic score, actual captured code output, a Wrapper-generated image and a local queue benchmark. Designed scenes show the development workflow; this is an edited presentation, not an uncut screen recording. [Evidence and rendering details](video/README.md).
+A 1080p product film with original music, an opening task sleeve, actual captured code output, a Wrapper-generated image and a local queue benchmark. Designed scenes show the development workflow; this is an edited presentation, not an uncut screen recording. [Evidence and rendering details](video/README.md).
 
 <details>
 <summary>Play the animated preview</summary>
