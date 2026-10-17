@@ -1,22 +1,24 @@
 {
-  "name": "chatgpt-wrapper",
-  "private": true,
-  "version": "0.3.0",
+  "name": "@rnaefe/chatgpt-wrapper",
+  "version": "0.4.1",
   "type": "module",
   "packageManager": "pnpm@10.0.0",
   "scripts": {
     "dev": "pnpm build && pnpm --filter @chatgpt-wrapper/daemon dev",
-    "build": "pnpm -r build && node scripts/build-page-engine.mjs",
+    "build": "pnpm -r build && node scripts/build-page-engine.mjs && node scripts/build-distribution.mjs",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "start": "pnpm --filter @chatgpt-wrapper/daemon start",
     "mcp": "node apps/daemon/dist/mcp.js",
     "browser:install": "pnpm --filter @chatgpt-wrapper/daemon exec playwright install chromium",
     "browser:login": "pnpm connect",
-    "connect": "pnpm build && pnpm browser:install && node apps/daemon/dist/browser-login.js",
+    "connect": "pnpm build && node apps/daemon/dist/cli.js connect",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm format:check && pnpm build && pnpm typecheck && pnpm test"
+    "check": "pnpm format:check && pnpm build && pnpm typecheck && pnpm test",
+    "prepack": "pnpm build",
+    "test:package": "node scripts/test-package.mjs",
+    "release:check": "pnpm check && pnpm test:package"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
@@ -30,5 +32,27 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/rnaefe/chatgpt-wrapper.git"
+  },
+  "dependencies": {
+    "smol-toml": "^1.9.1",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "fastify": "^5.0.0",
+    "playwright": "^1.64.1",
+    "zod": "^4.0.0"
+  },
+  "bin": {
+    "chatgpt-wrapper": "dist/cli.js"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "docs/INSTALLATION.md",
+    "CHANGELOG.md",
+    "docs/BROWSER_RELIABILITY.md",
+    "docs/OBSERVABILITY.md"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

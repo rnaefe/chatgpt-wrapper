@@ -1,3 +1,4 @@
+import { packageMetadata } from "./runtime-paths.js";
 import { PlaywrightAdapter } from "./playwright-adapter.js";
 import Fastify from "fastify";
 import { timingSafeEqual } from "node:crypto";
@@ -79,6 +80,7 @@ export function createServer(options: {
     service: "chatgpt-wrapper",
   }));
   server.get("/v1/status", async () => ({
+    runtime: { pid: process.pid, version: packageMetadata.version },
     provider: worker.adapter.info(),
     counts: store.counts(),
     browserAdapter:
@@ -86,6 +88,28 @@ export function createServer(options: {
         ? { enabled: true, ...worker.adapter.status() }
         : { enabled: false, reason: "API adapter selected" },
   }));
+  server.get("/v1/metrics", async (req, reply) => {
+    const query = z
+      .object({ hours: z.coerce.number().int().min(1).max(720).default(24) })
+      .safeParse(req.query);
+    if (!query.success)
+      return reply.code(400).send({ error: "INVALID_METRICS_QUERY" });
+    return store.metrics(query.data.hours);
+  });
+  server.get("/v1/errors", async (req, reply) => {
+    const query = z
+      .object({
+        hours: z.coerce.number().int().min(1).max(720).default(24),
+        limit: z.coerce.number().int().min(1).max(100).default(20),
+      })
+      .safeParse(req.query);
+    if (!query.success)
+      return reply.code(400).send({ error: "INVALID_ERRORS_QUERY" });
+    return {
+      errors: store.failures(query.data.limit, query.data.hours),
+      ...query.data,
+    };
+  });
   server.post("/v1/browser/connect", async (_req, reply) => {
     if (!(worker.adapter instanceof PlaywrightAdapter))
       return reply.code(409).send({ error: "HEADLESS_ADAPTER_REQUIRED" });

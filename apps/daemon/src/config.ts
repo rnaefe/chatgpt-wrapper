@@ -6,27 +6,20 @@ import {
   chmodSync,
   unlinkSync,
 } from "node:fs";
-import { resolve, dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { Store } from "@chatgpt-wrapper/core";
 import { Worker } from "./worker.js";
 
 import { PlaywrightAdapter } from "./playwright-adapter.js";
+import { loadEnvironment, dataDirectory, enginePath } from "./runtime-paths.js";
 
 const DEFAULT_PORT = 11435;
 const MIN_TOKEN_LENGTH = 24;
-const ENGINE_PATH = "apps/daemon/dist/page-engine.js";
 
-export const root = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../..",
-);
 export function runtime() {
-  // Load only the repository .env; never print credentials.
-  const envFile = join(root, ".env");
-  if (existsSync(envFile)) process.loadEnvFile(envFile);
-  const directory = resolve(process.env.DATA_DIR ?? join(root, ".data"));
+  loadEnvironment();
+  const directory = dataDirectory();
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   chmodSync(directory, 0o700);
   const tokenPath = join(directory, "api-token");
@@ -73,8 +66,8 @@ export function runtime() {
   const store = new Store(directory);
   const adapter = new PlaywrightAdapter(
     directory,
-    join(root, ENGINE_PATH),
-    process.env.BROWSER_HEADLESS !== "false",
+    enginePath,
+    process.env.BROWSER_HEADLESS === "true",
   );
   return {
     store,

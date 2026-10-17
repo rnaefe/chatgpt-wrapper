@@ -67,25 +67,14 @@ export async function openProfile(
     );
   }
 }
-/** Visible mode keeps the signed-in context alive; prompts are never replayed. */
+/** Browser contexts live only for sign-in or a single task; prompts are never replayed. */
 export class PlaywrightAdapter implements Adapter {
   private active = false;
   private onboardingContext?: BrowserContext;
-  private visibleContext?: BrowserContext;
-  private keepVisible(context: BrowserContext) {
-    this.visibleContext = context;
-    context.once("close", () => {
-      if (this.visibleContext === context) {
-        this.visibleContext = undefined;
-        this.state = "NEEDS_AUTH";
-        this.message = "Browser closed. Run pnpm connect to reopen it.";
-      }
-    });
-  }
+  private taskContext?: BrowserContext;
   async close() {
     await this.onboardingContext?.close().catch(() => {});
-    await this.visibleContext?.close().catch(() => {});
-    this.visibleContext = undefined;
+    await this.taskContext?.close().catch(() => {});
   }
   private state: TaskStatus | "READY" | "SIGNING_IN" | "VERIFYING" =
     "NEEDS_AUTH";
@@ -105,7 +94,12 @@ export class PlaywrightAdapter implements Adapter {
     };
   }
   status() {
-    return { ...this.info(), state: this.state, message: this.message };
+    return {
+      ...this.info(),
+      state: this.state,
+      message: this.message,
+      mode: this.headless ? "headless" : "visible",
+    };
   }
   canStart() {
     return !this.active;
@@ -398,19 +392,14 @@ export class PlaywrightAdapter implements Adapter {
     let context: BrowserContext | undefined;
     try {
       const source = await this.loadEngine();
-      const existing = this.visibleContext;
-      context =
-        existing ??
-        (await openProfile(profileDirectory(this.directory), false));
+      context = await openProfile(profileDirectory(this.directory), false);
       this.onboardingContext = context;
-      if (!existing) await this.openPage(context);
+      await this.openPage(context);
       await waitForSignIn(context, source);
       if (!this.headless) {
-        if (!existing) this.keepVisible(context);
         this.state = "READY";
         this.message =
-          "ChatGPT connected. Keep this browser open; MCP tasks run here.";
-        context = undefined;
+          "Sign-in saved. The browser will open only while a task runs.";
         return;
       }
       this.state = "VERIFYING";
@@ -465,10 +454,11 @@ export class PlaywrightAdapter implements Adapter {
     signal.addEventListener("abort", abort, { once: true });
     try {
       const source = await this.loadEngine();
-      context =
-        this.visibleContext ??
-        (await openProfile(profileDirectory(this.directory), this.headless));
-      if (!this.headless && !this.visibleContext) this.keepVisible(context);
+      context = await openProfile(
+        profileDirectory(this.directory),
+        this.headless,
+      );
+      this.taskContext = context;
       if (signal.aborted) throw signal.reason;
       const page = await this.openTaskPage(context);
       const images = await this.uploadImages(page, request.images);
@@ -501,8 +491,8 @@ export class PlaywrightAdapter implements Adapter {
       );
     } finally {
       signal.removeEventListener("abort", abort);
-      if (this.headless || signal.aborted)
-        await context?.close().catch(() => {});
+      await context?.close().catch(() => {});
+      this.taskContext = undefined;
       this.active = false;
     }
   }

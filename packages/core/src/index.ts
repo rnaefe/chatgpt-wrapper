@@ -1,3 +1,4 @@
+import { durationSummary, elapsed, windowStart } from "./metrics.js";
 import { DatabaseSync } from "node:sqlite";
 import {
   chmodSync,
@@ -47,6 +48,7 @@ export class Store {
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, status TEXT NOT NULL, body TEXT NOT NULL, key TEXT UNIQUE, fingerprint TEXT, created TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS tasks_status ON tasks(status, created);
+      CREATE INDEX IF NOT EXISTS tasks_created ON tasks(created);
       CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, body TEXT NOT NULL);`);
   }
@@ -236,6 +238,76 @@ export class Store {
     if (createHash("sha256").update(data).digest("hex") !== id)
       throw new Error("Artifact integrity check failed");
     return data;
+  }
+  metrics(hours = 24) {
+    const since = windowStart(hours);
+    const rows = this.db
+      .prepare(
+        `SELECT status, json_extract(body,'$.createdAt') AS createdAt, json_extract(body,'$.startedAt') AS startedAt, json_extract(body,'$.finishedAt') AS finishedAt, json_extract(body,'$.error.code') AS errorCode FROM tasks WHERE created >= ?`,
+      )
+      .all(since);
+    const outcomes: Record<string, number> = {};
+    const errors: Record<string, number> = Object.create(null);
+    const queue: number[] = [],
+      execution: number[] = [],
+      total: number[] = [];
+    for (const row of rows) {
+      const status = String(row.status);
+      outcomes[status] = (outcomes[status] ?? 0) + 1;
+      if (row.errorCode) {
+        const code = String(row.errorCode);
+        errors[code] = (errors[code] ?? 0) + 1;
+      }
+      const queueMs = elapsed(row.createdAt, row.startedAt);
+      if (queueMs !== undefined) queue.push(queueMs);
+      const executionMs = elapsed(row.startedAt, row.finishedAt);
+      if (executionMs !== undefined) execution.push(executionMs);
+      const totalMs = elapsed(row.createdAt, row.finishedAt);
+      if (totalMs !== undefined) total.push(totalMs);
+    }
+    const completed = outcomes.COMPLETED ?? 0;
+    const terminalNonCancelled = [
+      "COMPLETED",
+      "FAILED",
+      "NEEDS_AUTH",
+      "NEEDS_HUMAN",
+      "BLOCKED_BY_PROVIDER",
+    ].reduce((sum, status) => sum + (outcomes[status] ?? 0), 0);
+    return {
+      since,
+      windowHours: hours,
+      generatedAt: new Date().toISOString(),
+      tasks: rows.length,
+      outcomes,
+      completed,
+      terminalNonCancelled,
+      successRate: terminalNonCancelled
+        ? completed / terminalNonCancelled
+        : null,
+      duration: {
+        queue: durationSummary(queue),
+        execution: durationSummary(execution),
+        total: durationSummary(total),
+      },
+      errors,
+    };
+  }
+  failures(limit = 20, hours = 24) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+      throw new Error("Error limit must be between 1 and 100");
+    const since = windowStart(hours);
+    return this.db
+      .prepare(
+        `SELECT id, status, json_extract(body,'$.error.code') AS code, json_extract(body,'$.createdAt') AS createdAt, json_extract(body,'$.finishedAt') AS finishedAt FROM tasks WHERE created >= ? AND json_extract(body,'$.error.code') IS NOT NULL ORDER BY created DESC,id DESC LIMIT ?`,
+      )
+      .all(since, limit)
+      .map((row) => ({
+        id: String(row.id),
+        status: String(row.status),
+        code: String(row.code),
+        createdAt: String(row.createdAt),
+        finishedAt: row.finishedAt ? String(row.finishedAt) : undefined,
+      }));
   }
   close() {
     this.db.close();

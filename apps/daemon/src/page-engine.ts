@@ -450,9 +450,7 @@ export async function executeInPage(
             : undefined;
         const response = (responses.at(-1) ??
           imageResponses.at(-1) ??
-          generatedImage?.parentElement) as
-          | Element
-          | undefined;
+          generatedImage?.parentElement) as Element | undefined;
         if (response) {
           const text = markdown(
             response.querySelector(
@@ -479,20 +477,21 @@ export async function executeInPage(
           ).filter((image) => image.src);
           const hasGeneratedImage = images.length > 0;
           const complete =
-            (!turnState || turnState === "complete") &&
-            firstVisible(doc, stopSelector) === null &&
-            !turn.querySelector(
-              '[data-is-streaming="true"], [aria-busy="true"]',
-            ) &&
-            Array.from(
-              turn.querySelectorAll(
-                '[data-testid="copy-turn-action-button"], [data-testid="copy-turn-action"], button[aria-label="Copy"], button[aria-label="Copy response"], button[aria-label="Copy message"]',
-              ),
-            ).some(
-              (button) =>
-                visible(button) &&
-                !!(response.compareDocumentPosition(button) & 4),
-            ) || (request.capability === "image.generate" && hasGeneratedImage);
+            ((!turnState || turnState === "complete") &&
+              firstVisible(doc, stopSelector) === null &&
+              !turn.querySelector(
+                '[data-is-streaming="true"], [aria-busy="true"]',
+              ) &&
+              Array.from(
+                turn.querySelectorAll(
+                  '[data-testid="copy-turn-action-button"], [data-testid="copy-turn-action"], button[aria-label="Copy"], button[aria-label="Copy response"], button[aria-label="Copy message"]',
+                ),
+              ).some(
+                (button) =>
+                  visible(button) &&
+                  !!(response.compareDocumentPosition(button) & 4),
+              )) ||
+            (request.capability === "image.generate" && hasGeneratedImage);
           if (
             (text || hasGeneratedImage) &&
             complete &&

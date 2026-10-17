@@ -7,11 +7,15 @@ import {
 } from "node:fs";
 import { spawn } from "node:child_process";
 import { join, resolve } from "node:path";
-import { root } from "./config.js";
+import {
+  loadEnvironment,
+  dataDirectory,
+  daemonEntry,
+  packageRoot,
+} from "./runtime-paths.js";
 
 export async function localClient() {
-  const file = join(root, ".env");
-  if (existsSync(file)) process.loadEnvFile(file);
+  loadEnvironment();
   const base = new URL(
     process.env.WRAPPER_URL ?? `http://127.0.0.1:${process.env.PORT ?? 11435}`,
   );
@@ -25,7 +29,7 @@ export async function localClient() {
     base.pathname !== "/"
   )
     throw new Error("WRAPPER_URL must be a loopback HTTP origin");
-  const directory = resolve(process.env.DATA_DIR ?? join(root, ".data"));
+  const directory = dataDirectory();
   const tokenFile = join(directory, "api-token");
   const token = () =>
     process.env.LOCAL_API_TOKEN ??
@@ -61,16 +65,12 @@ export async function localClient() {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     const log = openSync(join(directory, "daemon.log"), "a", 0o600);
     try {
-      const child = spawn(
-        process.execPath,
-        [join(root, "apps/daemon/dist/index.js")],
-        {
-          cwd: root,
-          env: process.env,
-          detached: true,
-          stdio: ["ignore", log, log],
-        },
-      );
+      const child = spawn(process.execPath, [daemonEntry], {
+        cwd: packageRoot,
+        env: process.env,
+        detached: true,
+        stdio: ["ignore", log, log],
+      });
       child.on("error", (error) => {
         console.error("Daemon failed to start", error.message);
       });
@@ -87,11 +87,15 @@ export async function localClient() {
       }
     }
     if (!ready)
-      throw new Error("Daemon could not start. Check .data/daemon.log");
+      throw new Error(
+        `Daemon could not start. Check ${join(directory, "daemon.log")}`,
+      );
   }
   const credential = token();
   if (!credential)
-    throw new Error("Local token is missing. Restart the daemon.");
+    throw new Error(
+      `The running daemon uses a different data directory. Stop it or select another PORT. Expected token in ${directory}.`,
+    );
   return async (path: string, body?: unknown) => {
     const response = await fetch(new URL(path, base), {
       method: body === undefined ? "GET" : "POST",

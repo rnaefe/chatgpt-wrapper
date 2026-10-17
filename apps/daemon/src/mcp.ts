@@ -3,13 +3,17 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { taskRequestSchema, statusSchema } from "@chatgpt-wrapper/contracts";
 
+import { packageMetadata } from "./runtime-paths.js";
 import { localClient } from "./local-client.js";
 // All MCP clients share the daemon; startup and local authentication are automatic.
 const api = await localClient();
 function result(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value) }] };
 }
-const server = new McpServer({ name: "chatgpt-wrapper", version: "0.3.0" });
+const server = new McpServer({
+  name: "chatgpt-wrapper",
+  version: packageMetadata.version,
+});
 server.registerTool(
   "submit_task",
   {
@@ -74,5 +78,30 @@ server.registerTool(
       content: [{ type: "text" as const, text: data.toString("utf8") }],
     };
   },
+);
+server.registerTool(
+  "get_metrics",
+  {
+    description:
+      "Read local task success rates, duration percentiles and error-code counts. Excludes prompts and responses. These are Wrapper task metrics, not ChatGPT quota telemetry.",
+    inputSchema: { hours: z.number().int().min(1).max(720).default(24) },
+  },
+  async ({ hours }) =>
+    result(await (await api(`/v1/metrics?hours=${hours}`)).json()),
+);
+server.registerTool(
+  "list_errors",
+  {
+    description:
+      "List recent local task failures by task ID, status and error code, without prompt or response text.",
+    inputSchema: {
+      hours: z.number().int().min(1).max(720).default(24),
+      limit: z.number().int().min(1).max(100).default(20),
+    },
+  },
+  async ({ hours, limit }) =>
+    result(
+      await (await api(`/v1/errors?hours=${hours}&limit=${limit}`)).json(),
+    ),
 );
 await server.connect(new StdioServerTransport());
