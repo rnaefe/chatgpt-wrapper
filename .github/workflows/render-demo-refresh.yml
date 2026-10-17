@@ -32,6 +32,8 @@ jobs:
       - name: Ensure Chromium for rendering
         working-directory: video
         run: npx remotion browser ensure
+      - name: Install FFmpeg for GIF, audio and media checks
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
       - name: Render MP4, animated preview, poster and captions
         working-directory: video
         run: npm run publish-assets
