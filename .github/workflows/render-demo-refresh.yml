@@ -1,0 +1,46 @@
+name: Render updated demo media
+
+on:
+  push:
+    branches:
+      - docs/literal-wrapper-demo-refresh
+    paths:
+      - video/**
+      - .github/workflows/render-demo-refresh.yml
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Remotion dependencies
+        working-directory: video
+        run: npm ci
+      - name: Typecheck video source
+        working-directory: video
+        run: npm run typecheck
+      - name: Ensure Chromium for rendering
+        working-directory: video
+        run: npx remotion browser ensure
+      - name: Render MP4, animated preview, poster and captions
+        working-directory: video
+        run: npm run publish-assets
+      - name: Commit rendered media to this branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/assets/wrapper-demo.mp4 docs/assets/wrapper-demo.gif docs/assets/wrapper-demo.png docs/assets/captions.vtt
+          if ! git diff --cached --quiet; then
+            git commit -m "video: render refreshed product demo assets"
+            git push origin HEAD:docs/literal-wrapper-demo-refresh
+          fi
