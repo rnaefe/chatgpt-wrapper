@@ -280,8 +280,13 @@ export class Store {
       throw error;
     }
     // Metadata commits first; a failed file deletion leaves only a harmless orphan file.
-    for (const id of orphanIds)
-      rmSync(join(this.directory, "artifacts", id), { force: true });
+    for (const id of orphanIds) {
+      try {
+        rmSync(join(this.directory, "artifacts", id), { force: true });
+      } catch (error) {
+        console.warn("Could not remove expired artifact", id, error);
+      }
+    }
     return { tasks: expired.length, artifacts: orphanIds.length };
   }
 
