@@ -1,7 +1,7 @@
 [
   {
     "seconds": 4,
-    "caption": "ChatGPT through MCP. Send work from your coding client and get code, analysis and images back."
+    "caption": "I hit my Codex usage limit, so I literally wrapped ChatGPT. Playwright for the browser, MCP for coding tools."
   },
   {
     "seconds": 6,
@@ -21,10 +21,10 @@
   },
   {
     "seconds": 6,
-    "caption": "Local fixture benchmark: median queue, validation and persistence improved from 244 to 1.7 milliseconds. Twelve samples; browser and provider time excluded."
+    "caption": "Install with one npm command, sign in to your own ChatGPT session, and use Wrapper from Codex. Node.js 24 or newer required."
   },
   {
     "seconds": 4,
-    "caption": "Build from source at github.com/rnaefe/chatgpt-wrapper. Requires Node.js 24 and your ChatGPT account. Sign-in and provider verification remain manual."
+    "caption": "ChatGPT Wrapper is open source at github.com/rnaefe/chatgpt-wrapper. Unofficial and experimental; provider verification can interrupt tasks."
   }
 ]
