@@ -11,10 +11,12 @@ export class Worker {
   };
   private stopping = false;
   private timer?: ReturnType<typeof setInterval>;
+  private lastRetentionSweep = 0;
 
   constructor(
     private readonly store: Store,
     readonly adapter: Adapter,
+    private readonly retentionDays = 30,
   ) {}
 
   start() {
@@ -37,6 +39,10 @@ export class Worker {
 
   async tick() {
     if (this.active || this.stopping) return;
+    if (this.retentionDays > 0 && Date.now() - this.lastRetentionSweep >= 86_400_000) {
+      this.lastRetentionSweep = Date.now();
+      this.store.pruneOlderThan(new Date(Date.now() - this.retentionDays * 86_400_000));
+    }
     if (this.adapter.canStart?.() === false) return;
     const next = this.store.next();
     if (!next) return;
