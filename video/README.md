@@ -1,10 +1,6 @@
 # Wrapper product film
 
-A 40-second Remotion film at 1920×1080 / 30 fps, with an original 120 BPM electronic score, beat-aligned scenes, a packaging-sleeve concept and real Wrapper outputs. The film is a designed product presentation, not an uncut screen recording.
-
-## Art direction
-
-The current revision applies [Taste Skill](https://github.com/Leonxlnx/taste-skill): olive and bone fields, wide TikTok Sans typography, a task envelope that opens into an actual artifact, and different compositions for neighbouring scenes. Decorative terminal grids, index numbers, headline colour accents and repetitive feature cards have been removed. [Direction, provenance and review notes](art-direction.md).
+A 40-second Remotion film at 1920×1080 / 30 fps, with an original 120 BPM electronic score, beat-aligned scenes, kinetic typography and real Wrapper outputs. The film is a designed product presentation, not an uncut screen recording.
 
 ## Evidence behind the film
 

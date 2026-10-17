@@ -1,251 +1,235 @@
 import React, { useContext } from "react";
 import { Img, staticFile, useCurrentFrame } from "remotion";
 import session from "../public/session.json";
-import { colors as c, type as t } from "./constants";
+import { colors as c } from "./constants";
 import {
-  Body,
   Calm,
-  codeFace,
   Headline,
+  mono,
+  Panel,
   progress,
-  Reveal,
+  Rise,
   Stage,
+  Tag,
 } from "./design";
-import { Sleeve } from "./sleeve";
 
 export function Intro() {
+  const frame = useCurrentFrame();
+  const calm = useContext(Calm);
   return (
     <Stage
-      brand={false}
-      note="Packaging illustration using an actual Wrapper-generated image. Independent, experimental project."
+      index={1}
+      title="Your toolchain"
+      seconds={4}
+      note="Independent, experimental project. Uses your own ChatGPT account."
     >
-      <div style={{ position: "absolute", left: 665, top: 185 }}>
-        <Sleeve />
-      </div>
-      <Reveal
-        delay={4}
-        style={{
-          position: "absolute",
-          top: 565,
-          left: 0,
-          right: 0,
-          textAlign: "center",
-        }}
-      >
-        <Headline
+      <Rise style={{ marginTop: 125 }}>
+        <Tag>ChatGPT, through MCP.</Tag>
+      </Rise>
+      <Rise delay={3}>
+        <Headline size={146}>
+          YOUR CHATGPT.
+          <br />
+          <span style={{ color: c.accent }}>IN YOUR TOOLCHAIN.</span>
+        </Headline>
+      </Rise>
+      <Rise delay={6}>
+        <p
           style={{
-            fontSize: t.display,
-            lineHeight: 1,
-            letterSpacing: "-.01em",
+            fontSize: 30,
+            color: c.muted,
+            maxWidth: 1200,
+            lineHeight: 1.4,
           }}
         >
-          wrapper
-        </Headline>
-      </Reveal>
-      <Reveal
-        delay={8}
+          Send work from your coding client.
+          <br />
+          Get code, analysis and images back.
+        </p>
+      </Rise>
+      <div
         style={{
           position: "absolute",
-          top: 855,
-          left: 0,
-          right: 0,
-          textAlign: "center",
+          right: 40,
+          top: 105,
+          fontFamily: mono,
+          fontSize: 160,
+          color: c.accent,
+          opacity: 0.16,
+          transform: calm
+            ? undefined
+            : `translateY(${Math.sin(frame / 25) * 8}px)`,
         }}
       >
-        <Body style={{ maxWidth: "none", fontSize: t.lead }}>
-          Your ChatGPT session, inside your MCP client.
-        </Body>
-      </Reveal>
+        ↗
+      </div>
     </Stage>
   );
 }
 export function Workflow() {
   const frame = useCurrentFrame();
   const calm = useContext(Calm);
-  const gather = calm ? 1 : progress(frame, 12, 60);
-  const release = calm ? 1 : progress(frame, 70, 110);
-  const pieces = [
-    {
-      name: "Objective",
-      text: "Write a TypeScript clamp function",
-      x: 0,
-      y: 0,
-    },
-    { name: "Output", text: "Complete source code", x: 75, y: 166 },
-    {
-      name: "Constraints",
-      text: "Preserve code and report limits",
-      x: 20,
-      y: 332,
-    },
-  ];
+  const nodes = ["MCP CLIENT", "LOCAL QUEUE", "CHATGPT", "YOUR RESULT"];
   return (
-    <Stage note="Conceptual task envelope. A durable SQLite queue runs one browser task at a time.">
-      <Reveal style={{ position: "absolute", left: 64, top: 150, width: 900 }}>
+    <Stage
+      index={2}
+      title="The workflow"
+      seconds={6}
+      note="Conceptual flow. Saved browser session; one provider task at a time."
+    >
+      <Rise style={{ marginTop: 80 }}>
+        <Tag>One local bridge.</Tag>
         <Headline>
-          Wrapped
+          Keep the work
           <br />
-          with context
+          in your coding flow.
         </Headline>
-      </Reveal>
-      <Body style={{ position: "absolute", left: 64, top: 450, width: 660 }}>
-        Your objective and constraints travel together. Wrapper returns the
-        resulting artifact to your coding client.
-      </Body>
+      </Rise>
       <div
         style={{
-          position: "absolute",
-          left: 1000,
-          top: 180,
-          width: 800,
-          height: 580,
+          display: "flex",
+          gap: 20,
+          alignItems: "center",
+          marginTop: 65,
         }}
       >
-        {pieces.map((piece, index) => (
-          <div
-            key={piece.name}
-            style={{
-              position: "absolute",
-              left: piece.x * (1 - gather),
-              top: piece.y * (1 - gather) + index * 17,
-              background: index === 2 ? c.ink : c.surface,
-              color: index === 2 ? c.background : c.ink,
-              width: 710,
-              padding: "34px 40px",
-              height: 170,
-              transform: calm
-                ? undefined
-                : `rotate(${(1 - gather) * (index - 1) * 4}deg) translateY(${-release * index * 28}px)`,
-              opacity: Math.max(0, 1 - release * 2),
-            }}
-          >
-            <div style={{ fontSize: t.body, fontWeight: 800 }}>
-              {piece.name}
-            </div>
-            <div style={{ fontSize: t.body, marginTop: 18 }}>{piece.text}</div>
-          </div>
+        {nodes.map((node, index) => (
+          <React.Fragment key={node}>
+            <Rise delay={index * 2} style={{ width: 370 }}>
+              <div
+                style={{
+                  background: index === 2 ? c.accent : c.panel,
+                  color: index === 2 ? c.background : c.text,
+                  padding: "44px 24px",
+                  borderRadius: 20,
+                  border: `1px solid ${c.line}`,
+                }}
+              >
+                <div style={{ fontFamily: mono, fontSize: 18, opacity: 0.6 }}>
+                  0{index + 1}
+                </div>
+                <div style={{ fontWeight: 600, fontSize: 28, marginTop: 36 }}>
+                  {node}
+                </div>
+              </div>
+            </Rise>
+            {index < 3 ? (
+              <span style={{ color: c.accent, fontSize: 36 }}>→</span>
+            ) : null}
+          </React.Fragment>
         ))}
       </div>
       <div
         style={{
-          position: "absolute",
-          left: 1000,
-          top: 210,
-          width: 760,
-          minHeight: 500,
-          padding: 40,
-          background: c.ink,
-          color: c.background,
-          opacity: release,
+          marginTop: 50,
+          height: 3,
+          background: c.line,
+          position: "relative",
+          overflow: "hidden",
         }}
       >
-        <div style={{ fontSize: t.lead, fontWeight: 500 }}>Task envelope</div>
-        <pre
+        <div
           style={{
-            fontFamily: codeFace,
-            fontSize: 26,
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
-            margin: "30px 0 0",
+            position: "absolute",
+            width: 140,
+            height: 3,
+            background: c.accent,
+            transform: `translateX(${calm ? 800 : ((frame * 12) % 1800) - 140}px)`,
           }}
-        >
-          {JSON.stringify(
-            {
-              capability: "code.generate",
-              objective: "Write a TypeScript clamp function",
-              acceptanceCriteria: ["Return complete source code"],
-            },
-            null,
-            2,
-          )}
-        </pre>
+        />
       </div>
-      <Reveal delay={75} style={{ position: "absolute", left: 1000, top: 750 }}>
-        <Body>Submit once. Wait for the result.</Body>
-      </Reveal>
     </Stage>
   );
 }
 export function Code() {
   const frame = useCurrentFrame();
-  const calm = useContext(Calm);
-  const reveal = calm ? 1 : progress(frame, 25, 85);
-  const code = session.task[3];
+  const code = session.task.slice(3, 4).join("\n");
+  const visible = Math.floor(progress(frame, 18, 70) * code.length);
   return (
     <Stage
-      inverse
-      note="Actual recorded provider result, 17 Oct 2026. Rendered presentation. Timing varies; waiting shortened."
+      index={3}
+      title="Actual captured output"
+      seconds={8}
+      note="Recorded provider result, 17 Oct 2026. Rendered presentation; waiting shortened."
     >
       <div
         style={{
-          position: "absolute",
-          left: 0,
-          top: 125,
-          width: 900,
-          padding: "55px 64px",
+          display: "grid",
+          gridTemplateColumns: "600px 1fr",
+          gap: 70,
+          marginTop: 100,
         }}
       >
-        <Reveal>
-          <Headline>Ask for code</Headline>
-        </Reveal>
-        <Body style={{ marginTop: 45, maxWidth: 670 }}>
-          Write a TypeScript clamp function and return the complete source.
-        </Body>
-        <pre
-          style={{
-            fontFamily: codeFace,
-            fontSize: 26,
-            lineHeight: 1.6,
-            whiteSpace: "pre-wrap",
-            marginTop: 75,
-            width: 680,
-          }}
-        >
-          {JSON.stringify(
-            {
-              capability: "code.generate",
-              objective: "Return a TypeScript clamp function",
-            },
-            null,
-            2,
-          )}
-        </pre>
-        <Body style={{ marginTop: 80 }}>
-          Captured run: {session.seconds} seconds.
-        </Body>
-      </div>
-      <div
-        style={{
-          position: "absolute",
-          left: 960,
-          top: 0,
-          bottom: 100,
-          right: 0,
-          background: c.surface,
-          color: c.ink,
-          padding: "180px 64px",
-          clipPath: calm ? undefined : `inset(0 ${(1 - reveal) * 100}% 0 0)`,
-        }}
-      >
-        <Headline>Get the source</Headline>
-        <pre
-          style={{
-            fontFamily: codeFace,
-            fontSize: 30,
-            lineHeight: 1.6,
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-            marginTop: 85,
-            maxWidth: 800,
-          }}
-        >
-          {code}
-        </pre>
-        <Body
-          style={{ position: "absolute", bottom: 150, left: 64, width: 780 }}
-        >
-          The captured source is preserved. Review it before applying it.
-        </Body>
+        <div>
+          <Rise>
+            <Tag>code.generate</Tag>
+            <Headline size={94}>
+              A prompt in.
+              <br />
+              Code back.
+            </Headline>
+          </Rise>
+          <Rise delay={4}>
+            <p style={{ fontSize: 27, color: c.muted, lineHeight: 1.5 }}>
+              A TypeScript clamp function.
+              <br />
+              Source preserved in a fenced block.
+            </p>
+            <div
+              style={{
+                fontFamily: mono,
+                fontSize: 66,
+                color: c.accent,
+                marginTop: 50,
+              }}
+            >
+              {session.seconds}
+              <span style={{ fontSize: 30 }}>s</span>
+            </div>
+            <div style={{ fontSize: 19, color: c.muted, marginTop: 10 }}>
+              This captured run. Timing varies.
+            </div>
+          </Rise>
+        </div>
+        <Rise delay={5}>
+          <Panel label="CAPTURED MCP RESPONSE / TYPESCRIPT">
+            <div
+              style={{
+                fontFamily: mono,
+                fontSize: 23,
+                color: c.muted,
+                paddingBottom: 26,
+                borderBottom: `1px solid ${c.line}`,
+              }}
+            >
+              submit_task → wait_task → result
+            </div>
+            <pre
+              style={{
+                fontFamily: mono,
+                fontSize: 29,
+                lineHeight: 1.7,
+                whiteSpace: "pre-wrap",
+                overflowWrap: "anywhere",
+                minHeight: 270,
+                color: c.text,
+              }}
+            >
+              {code.slice(0, visible)}
+              <span style={{ color: c.accent }}>▍</span>
+            </pre>
+            <div
+              style={{
+                fontFamily: mono,
+                color: c.accent,
+                fontSize: 20,
+                opacity: progress(frame, 85, 100),
+              }}
+            >
+              ✓ Actual source verified
+            </div>
+          </Panel>
+        </Rise>
       </div>
     </Stage>
   );
@@ -253,98 +237,133 @@ export function Code() {
 export function ImageResult() {
   const frame = useCurrentFrame();
   const calm = useContext(Calm);
-  const open = calm ? 1 : progress(frame, 5, 45);
-  const fit = calm ? 1 : progress(frame, 65, 130);
   return (
-    <Stage note="Actual Wrapper-generated artifact. Preview, metadata and download are presented as an editorial layout.">
-      <Reveal style={{ position: "absolute", left: 64, top: 160, width: 670 }}>
-        <Headline>
-          Keep the
-          <br />
-          image
-        </Headline>
-      </Reveal>
-      <Body style={{ position: "absolute", left: 64, top: 445, width: 590 }}>
-        Generated through Wrapper.
-        <br />
-        Delivered with a PNG file and chat-ready display links.
-      </Body>
+    <Stage
+      index={4}
+      title="Actual generated artifact"
+      seconds={6}
+      note="Image generated through Wrapper. File export and chat-link delivery shown conceptually."
+    >
       <div
         style={{
-          position: "absolute",
-          left: 865,
-          top: 125,
-          width: 850,
-          height: 720,
-          overflow: "hidden",
-          background: c.surface,
-          clipPath: calm ? undefined : `inset(0 0 ${(1 - open) * 100}% 0)`,
+          display: "grid",
+          gridTemplateColumns: "520px 1fr",
+          gap: 70,
+          marginTop: 95,
         }}
       >
-        <Img
-          src={staticFile("istanbul-cat.png")}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-            transform: calm ? undefined : `scale(${1.35 - fit * 0.35})`,
-          }}
-        />
+        <Rise>
+          <Tag>image.generate</Tag>
+          <Headline size={100}>
+            Make it.
+            <br />
+            See it.
+            <br />
+            <span style={{ color: c.accent }}>Save it.</span>
+          </Headline>
+          <p style={{ fontSize: 26, lineHeight: 1.5, color: c.muted }}>
+            A real image artifact,
+            <br />
+            with a preview and a local file.
+          </p>
+          <div
+            style={{
+              fontFamily: mono,
+              fontSize: 20,
+              color: c.accent,
+              marginTop: 42,
+            }}
+          >
+            PNG / DISPLAY / DOWNLOAD ↗
+          </div>
+        </Rise>
+        <Rise delay={3}>
+          <div
+            style={{
+              height: 640,
+              borderRadius: 24,
+              overflow: "hidden",
+              position: "relative",
+              border: `1px solid ${c.line}`,
+            }}
+          >
+            <Img
+              src={staticFile("istanbul-cat.png")}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                transform: calm ? undefined : `scale(${1.03 + frame * 0.0002})`,
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                bottom: 22,
+                left: 22,
+                background: "#0a0c11e8",
+                padding: "16px 24px",
+                borderRadius: 12,
+                fontFamily: mono,
+                fontSize: 19,
+                color: c.accent,
+              }}
+            >
+              ✓ image/png · delivered
+            </div>
+          </div>
+        </Rise>
       </div>
-      <Body
-        style={{ position: "absolute", left: 865, top: 870, fontSize: t.small }}
-      >
-        Istanbul at sunset. Actual generated output.
-      </Body>
     </Stage>
   );
 }
 const capabilities = [
-  ["code.generate", "Write complete code"],
-  ["code.review", "Review for actionable defects"],
-  ["reason.analyze", "Work through a decision"],
-  ["image.generate", "Create an image"],
-  ["image.analyze", "Describe, compare, read text"],
-  ["image.edit", "Edit an existing image"],
+  ["01", "code.generate", "Write complete code"],
+  ["02", "code.review", "Find actionable defects"],
+  ["03", "reason.analyze", "Work through a decision"],
+  ["04", "image.generate", "Create an image"],
+  ["05", "image.analyze", "Describe, compare, read text"],
+  ["06", "image.edit", "Change an existing image"],
 ];
 export function Capabilities() {
-  const frame = useCurrentFrame();
-  const calm = useContext(Calm);
-  const selected = calm ? 3 : Math.min(5, Math.floor(frame / 30));
   return (
     <Stage
-      surface
+      index={5}
+      title="Six task types"
+      seconds={6}
       note="Development capabilities. Image analysis/editing have fixture coverage; live access depends on provider UI."
     >
-      <Reveal style={{ position: "absolute", top: 160, left: 64, width: 600 }}>
-        <Headline>
-          Six task
-          <br />
-          types
-        </Headline>
-      </Reveal>
-      <Body style={{ position: "absolute", top: 440, left: 64, width: 590 }}>
-        Six task types share the same queue, saved session and artifact
-        delivery.
-      </Body>
-      <div style={{ position: "absolute", left: 810, top: 140, right: 64 }}>
-        {capabilities.map(([name, description], index) => (
-          <div
-            key={name}
-            style={{
-              padding: "18px 30px",
-              background: index === selected ? c.ink : "transparent",
-              color: index === selected ? c.background : c.ink,
-              minHeight: 125,
-            }}
-          >
-            <div style={{ fontSize: t.lead, fontWeight: 500 }}>{name}</div>
-            {index === selected ? (
-              <div style={{ fontSize: t.body, marginTop: 8 }}>
+      <Rise style={{ marginTop: 70 }}>
+        <Tag>Pick the work. Keep the workflow.</Tag>
+        <Headline size={82}>Six tasks. One MCP connection.</Headline>
+      </Rise>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3,1fr)",
+          gap: 22,
+          marginTop: 45,
+        }}
+      >
+        {capabilities.map(([number, title, description], index) => (
+          <Rise key={title} delay={index * 2}>
+            <div
+              style={{
+                borderTop: `2px solid ${index < 3 ? c.accent : c.violet}`,
+                background: c.panel,
+                padding: 28,
+                height: 210,
+              }}
+            >
+              <Tag>{number}</Tag>
+              <div style={{ fontFamily: mono, fontSize: 30, marginTop: 25 }}>
+                {title}
+              </div>
+              <div style={{ fontSize: 23, color: c.muted, marginTop: 16 }}>
                 {description}
               </div>
-            ) : null}
-          </div>
+            </div>
+          </Rise>
         ))}
       </div>
     </Stage>
@@ -352,125 +371,78 @@ export function Capabilities() {
 }
 export function Speed() {
   return (
-    <Stage note="12 sequential fixture tasks. Median queue + validation + persistence. Browser and provider time excluded.">
-      <Reveal style={{ position: "absolute", left: 64, top: 145 }}>
-        <Headline>A queue that wakes</Headline>
-      </Reveal>
-      <div
-        style={{
-          position: "absolute",
-          left: 64,
-          top: 350,
-          width: 900,
-          height: 590,
-          background: c.ink,
-          color: c.background,
-          padding: 45,
-        }}
-      >
-        <Reveal delay={5}>
-          <div
-            style={{
-              fontSize: t.display,
-              fontWeight: 800,
-              fontVariantNumeric: "tabular-nums",
-              lineHeight: 1,
-            }}
-          >
-            1.7<span style={{ fontSize: t.lead, marginLeft: 20 }}>ms</span>
-          </div>
-        </Reveal>
-        <Body
-          style={{ position: "absolute", bottom: 42, left: 45, width: 760 }}
-        >
-          Median with event-driven scheduling.
-        </Body>
-      </div>
-      <div
-        style={{
-          position: "absolute",
-          left: 980,
-          top: 460,
-          width: 435,
-          height: 480,
-          background: c.surface,
-          padding: 38,
-        }}
-      >
-        <Reveal delay={8}>
-          <div style={{ fontSize: t.head, fontWeight: 800, lineHeight: 1 }}>
-            244
-          </div>
-          <Body>milliseconds before</Body>
-        </Reveal>
-        <Body
-          style={{ position: "absolute", bottom: 38, left: 38, width: 340 }}
-        >
-          Previous 250 ms polling interval.
-        </Body>
-      </div>
-      <div
-        style={{
-          position: "absolute",
-          left: 1431,
-          top: 590,
-          width: 425,
-          height: 350,
-          background: c.ink,
-          color: c.background,
-          padding: 38,
-        }}
-      >
-        <Reveal delay={11}>
-          <div style={{ fontSize: t.head, fontWeight: 800, lineHeight: 1 }}>
-            12
-          </div>
-          <Body>local samples</Body>
-        </Reveal>
-        <Body
+    <Stage
+      index={6}
+      title="Measured locally"
+      seconds={6}
+      light
+      note="12 sequential local-fixture tasks. Median queue + validation + persistence. Excludes browser/provider time."
+    >
+      <Rise style={{ marginTop: 80 }}>
+        <Tag light>Wake on work. Stop polling the queue.</Tag>
+        <Headline size={98}>
+          Less waiting
+          <br />
+          before work starts.
+        </Headline>
+      </Rise>
+      <Rise delay={3}>
+        <div
           style={{
-            position: "absolute",
-            bottom: 38,
-            left: 38,
-            width: 340,
-            fontSize: t.small,
+            display: "flex",
+            alignItems: "baseline",
+            gap: 65,
+            marginTop: 55,
           }}
         >
-          Provider generation
-          <br />
-          is not included.
-        </Body>
-      </div>
+          <div style={{ fontSize: 115, color: "#617b37", letterSpacing: -7 }}>
+            244<span style={{ fontSize: 45, letterSpacing: -2 }}> ms</span>
+          </div>
+          <span style={{ fontSize: 90 }}>→</span>
+          <div style={{ fontSize: 200, fontWeight: 700, letterSpacing: -13 }}>
+            1.7<span style={{ fontSize: 55, letterSpacing: -2 }}> ms</span>
+          </div>
+        </div>
+      </Rise>
+      <Rise delay={6}>
+        <div style={{ fontFamily: mono, fontSize: 25, marginTop: 24 }}>
+          Event-driven queue · wait_task · indexed event history
+        </div>
+      </Rise>
     </Stage>
   );
 }
 export function Outro() {
   return (
     <Stage
-      inverse
-      brand={false}
-      note="Node.js 24+ and your ChatGPT account. Manual sign-in; provider verification can interrupt work."
+      index={7}
+      title="Build from source"
+      seconds={4}
+      note="Node.js 24+ · Manual sign-in · Provider verification can interrupt work."
     >
-      <Body
-        style={{ position: "absolute", left: 64, top: 90, fontSize: t.lead }}
-      >
-        Build from source.
-      </Body>
-      <Reveal style={{ position: "absolute", left: 64, right: 64, top: 235 }}>
-        <Headline style={{ fontSize: t.display }}>
-          Clone
+      <Rise style={{ marginTop: 120 }}>
+        <Tag>Open source. Local worker. Your session.</Tag>
+        <Headline size={138}>
+          PUT WRAPPER
           <br />
-          Wrapper
+          <span style={{ color: c.accent }}>TO WORK.</span>
         </Headline>
-      </Reveal>
-      <Reveal delay={5} style={{ position: "absolute", left: 64, top: 805 }}>
-        <Body style={{ fontSize: t.lead, maxWidth: 1800 }}>
-          github.com/rnaefe/chatgpt-wrapper
-        </Body>
-        <Body style={{ marginTop: 25, maxWidth: 1800 }}>
-          pnpm install → pnpm build → pnpm connect
-        </Body>
-      </Reveal>
+      </Rise>
+      <Rise delay={3}>
+        <div style={{ fontFamily: mono, fontSize: 36, marginTop: 35 }}>
+          github.com/rnaefe/chatgpt-wrapper ↗
+        </div>
+        <div
+          style={{
+            fontFamily: mono,
+            fontSize: 24,
+            color: c.muted,
+            marginTop: 30,
+          }}
+        >
+          Clone → pnpm install → pnpm build → pnpm connect
+        </div>
+      </Rise>
     </Stage>
   );
 }

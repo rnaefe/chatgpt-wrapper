@@ -153,6 +153,3 @@ vite.config.ts.timestamp-*
 
 # macOS metadata
 .DS_Store
-
-# Local art-direction working state
-.taste-skill/
