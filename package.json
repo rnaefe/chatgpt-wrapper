@@ -51,9 +51,23 @@
     "CHANGELOG.md",
     "docs/BROWSER_RELIABILITY.md",
     "docs/OBSERVABILITY.md",
-    "docs/SECURITY.md"
+    "docs/SECURITY.md",
+    "docs/MCP.md",
+    "docs/TROUBLESHOOTING.md"
   ],
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "homepage": "https://github.com/rnaefe/chatgpt-wrapper#readme",
+  "bugs": {
+    "url": "https://github.com/rnaefe/chatgpt-wrapper/issues"
+  },
+  "license": "GPL-3.0-only",
+  "keywords": [
+    "mcp",
+    "chatgpt",
+    "codex",
+    "playwright",
+    "cli"
+  ]
 }

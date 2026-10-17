@@ -155,11 +155,14 @@ export function isManagedEntry(value: unknown, directory: string): boolean {
   const entry = value as Partial<McpCommand>;
   if (
     !entry.env ||
-    resolve(entry.env.DATA_DIR ?? "") !== resolve(directory) ||
+    typeof entry.env.DATA_DIR !== "string" ||
+    !isAbsolute(entry.env.DATA_DIR) ||
+    resolve(entry.env.DATA_DIR) !== resolve(directory) ||
     !Array.isArray(entry.args) ||
     entry.args.length !== 2 ||
     entry.args[1] !== "mcp" ||
-    typeof entry.args[0] !== "string"
+    typeof entry.args[0] !== "string" ||
+    !isAbsolute(entry.args[0])
   )
     return false;
   const path = relative(

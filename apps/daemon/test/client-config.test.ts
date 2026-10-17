@@ -175,3 +175,27 @@ it.each(["codex", "cursor", "claude-desktop"] as const)(
     expect(configureClient(client, null, { path }).changed).toBe(false);
   },
 );
+
+it("refuses automatic replacement of malformed or relative runtime entries", () => {
+  for (const previous of [
+    { ...entry, env: { DATA_DIR: 42 } },
+    {
+      ...entry,
+      args: [
+        "runtime/0.4.2/node_modules/@rnaefe/chatgpt-wrapper/dist/cli.js",
+        "mcp",
+      ],
+    },
+  ]) {
+    const path = file("config.json");
+    const original = JSON.stringify({ mcpServers: { wrapper: previous } });
+    writeFileSync(path, original);
+    expect(() =>
+      configureClient("cursor", entry, {
+        path,
+        managedDirectory: "/private/session",
+      }),
+    ).toThrow("--replace");
+    expect(readFileSync(path, "utf8")).toBe(original);
+  }
+});

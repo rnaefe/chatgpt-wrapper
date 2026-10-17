@@ -1,78 +1,98 @@
 # ChatGPT Wrapper
 
-A local MCP server that sends coding and analysis tasks to ChatGPT through a visible Playwright browser and returns completed responses as Markdown.
+Use your ChatGPT browser session from an MCP coding client. Wrapper queues a task, runs it in ChatGPT, and returns the response with code blocks intact.
 
-**Experimental.** Initial sign-in is visible; subsequent tasks run headlessly by default. Headless execution may encounter provider browser verification. A live MCP code task completed in visible mode on 2026-10-17. Set `BROWSER_HEADLESS=false` for visible tasks if headless execution is blocked; do not attempt to bypass browser verification.
+[Install](docs/INSTALLATION.md) · [npm](https://www.npmjs.com/package/@rnaefe/chatgpt-wrapper) · [Releases](https://github.com/rnaefe/chatgpt-wrapper/releases) · [Contribute](CONTRIBUTING.md)
 
-## Install through the CLI
+An unofficial, experimental project. Requires your own ChatGPT account; no OpenAI API key. Provider UI changes, verification prompts and account limits can interrupt tasks.
 
-Install version `0.4.2` from npm and configure Codex:
+## Start with Codex
+
+Requires **Node.js 24+**, npm and a desktop session.
 
 ```sh
 npx -y @rnaefe/chatgpt-wrapper@0.4.2
 ```
 
-Requires Node.js 24+ and npm. Setup installs Chromium, adds Wrapper to your MCP client, and opens ChatGPT for manual sign-in. Restart your MCP client after setup. The browser closes after sign-in and opens only while a task runs. No repository clone or config editing is needed.
+1. Setup installs Chromium and adds Wrapper to your Codex configuration, with a backup.
+2. Sign in to ChatGPT in the window that opens. Wrapper detects the session and closes the window.
+3. Restart Codex, then ask it to use Wrapper for a task.
 
-Codex is the primary setup target. `--client cursor` and `--client claude-desktop` are also supported. Existing settings are backed up. Wrapper recognizes and upgrades its own runtime entry; replacing an unrelated entry requires `--replace`.
+For example:
 
-See the [installation guide and local tarball testing](docs/INSTALLATION.md). The unscoped npm name `chatgpt-wrapper` belongs to another package.
+> Use Wrapper to generate a TypeScript LRU cache with a usage example. Poll the task until it finishes, then show me the result.
 
-To upgrade, run `npx -y @rnaefe/chatgpt-wrapper@latest update`, then restart your MCP client. The update stops an idle worker and preserves the saved session. `uninstall` removes the selected client entry with a backup and preserves local data.
+The browser opens while each task runs and closes afterwards. Your saved session is reused. Generated code is returned for review; Wrapper does not execute commands or modify your repository.
 
-For development from this repository:
+For another client, run `setup --client cursor` or `setup --client claude-desktop`. For custom paths, existing installations and removal, see the [installation guide](docs/INSTALLATION.md).
+
+## Everyday commands
 
 ```sh
-pnpm install
-pnpm connect
+# Update the managed installation, then restart your MCP client
+npx -y @rnaefe/chatgpt-wrapper@latest update
+
+# Reconnect if ChatGPT asks you to sign in again
+npx -y @rnaefe/chatgpt-wrapper@latest connect
+
+# Inspect the installation without opening a browser
+npx -y @rnaefe/chatgpt-wrapper@latest doctor
+
+# Remove Wrapper from Codex, preserving saved data
+npx -y @rnaefe/chatgpt-wrapper@latest uninstall
 ```
 
-## MCP tools
+Update and uninstall recognize managed settings from the selected client. Other client entries are preserved. User profiles, history and logs remain on disk after uninstall; [removal details](docs/INSTALLATION.md#updating-and-removing) explain how to erase them deliberately.
 
-The client uses the persistent installed runtime, not an npx cache directory. The launcher starts the shared worker and handles local authentication.
+## How it works
 
-| Tool           | Purpose                                    |
-| -------------- | ------------------------------------------ |
-| `submit_task`  | Queue a task and return its ID             |
-| `get_task`     | Read status, result and event history      |
-| `list_tasks`   | List tasks, with optional status filtering |
-| `cancel_task`  | Cancel queued or running work              |
-| `get_artifact` | Read a stored result                       |
-| `get_metrics`  | Success rate, durations and error counts   |
-| `list_errors`  | Recent task IDs, statuses and error codes  |
+```mermaid
+flowchart LR
+  Client[MCP client] --> MCP[Local stdio server]
+  MCP --> Queue[SQLite task queue]
+  Queue --> Browser[ChatGPT browser session]
+  Browser --> Result[Validated response and artifacts]
+  Result --> Client
+```
 
-Submit a task and poll its ID with `get_task`. Wrapper returns completed responses; the client decides whether to apply generated code. Wrapper never executes generated commands or applies patches.
+One worker processes one task at a time. Clients share the authenticated loopback worker and queue. Tasks persist across restarts, but interrupted submissions are never replayed automatically.
 
-## Local configuration
+| MCP tool       | Purpose                                        |
+| -------------- | ---------------------------------------------- |
+| `submit_task`  | Queue a coding, review, analysis or image task |
+| `get_task`     | Read status, response and event history        |
+| `list_tasks`   | Browse tasks, with optional status filtering   |
+| `cancel_task`  | Cancel queued or running work                  |
+| `get_artifact` | Read a stored text or image result             |
+| `get_metrics`  | Inspect success rates and task durations       |
+| `list_errors`  | Inspect recent task IDs and error codes        |
 
-No `.env` is required. Packaged installations store data in the OS application-data directory; development uses `.data`. Optional settings: `DATA_DIR`, `PORT` (default 11435), and `BROWSER_HEADLESS=true` to opt into experimental headless execution. Image inputs require explicit `IMAGE_INPUT_ROOTS` directories or `ALLOWED_IMAGE_HOSTS` HTTPS hosts. Terminal task history expires after `TASK_RETENTION_DAYS` (default 30; 0 disables expiry). Authentication lives in a separate private profile under `.data/playwright-profile`; it is never imported from your everyday browser or exported. Keep this directory private.
+See the [MCP usage guide](docs/MCP.md) for request examples and status handling.
 
-The worker uses an authenticated loopback transport internally so MCP clients share one SQLite queue. One task runs at a time; sign-in pauses task dispatch. Interrupted or ambiguous submissions are never replayed automatically.
+## What is verified
 
-Login expiration, browser challenges, and account limits require user intervention. No CAPTCHA bypass, stealth, cookie export, private endpoints, or quota evasion. Use only within your provider authorization. Image upload and generated-image extraction depend on the provider UI exposing the corresponding controls.
+On macOS, the 0.4.2 release passed 76 tests, a clean npm installation, Codex config preservation, a seven-tool MCP handshake, update and uninstall checks. Two live visible coding probes completed in 10.0 and 11.0 seconds. These are individual test results, not an uptime guarantee.
 
-## Development
+**Visible mode is the default.** Experimental headless mode encountered ChatGPT browser verification in the recorded test. Initial sign-in and verification remain manual. There is no challenge bypass or automatic prompt retry. Windows/Linux acceptance and long-session reliability remain unverified; image tasks were not part of the live coding checks. See [browser reliability](docs/BROWSER_RELIABILITY.md) for the evidence and repeatable checks.
+
+## Data and configuration
+
+No `.env` is needed for installation. Packaged installs use the OS application-data directory; repository development uses `.data`. The separate `playwright-profile` contains the saved ChatGPT session. Never share it, bearer tokens or task databases.
+
+Terminal tasks and unreferenced artifacts expire after 30 days by default (`TASK_RETENTION_DAYS=0` disables expiry). Browser credentials and logs are retained until removed. Image file paths and HTTPS downloads require explicit allowlists. Prompts and results are sent to ChatGPT; metrics stay local.
+
+Read [security and privacy](docs/SECURITY.md), [configuration](docs/INSTALLATION.md) and [observability](docs/OBSERVABILITY.md).
+
+## Contribute
 
 ```sh
+pnpm install --frozen-lockfile
 pnpm browser:install
 pnpm check
 ```
 
-Tests cover the durable queue, MCP, cancellation, browser lifecycle, onboarding, completion detection, and the shared engine in a real headless Chromium fixture. Chromium must be installed (`pnpm browser:install`) for that fixture. A live authenticated provider test is separate from fixture verification.
+Tests use local fixtures and do not require a ChatGPT account. Real provider checks are separate and explicitly invoked. See [CONTRIBUTING.md](CONTRIBUTING.md) for the package map, focused test commands and release checks. No CI workflow is included.
 
-## Troubleshooting
+[Report a bug](https://github.com/rnaefe/chatgpt-wrapper/issues/new/choose) · [Report a vulnerability privately](https://github.com/rnaefe/chatgpt-wrapper/security/advisories/new) · [Roadmap](docs/ROADMAP.md)
 
-| State or error         | Next step                                                                                                                                                                   |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `HEADLESS_CHALLENGE`   | ChatGPT requires browser verification in headless mode. Repeated sign-in is not a confirmed fix; optionally try `BROWSER_HEADLESS=false`, restart the worker, and reconnect |
-| `NEEDS_AUTH`           | Run `pnpm connect` to sign in                                                                                                                                               |
-| `NEEDS_HUMAN`          | Review the reported error; successful visible login does not guarantee headless access                                                                                      |
-| `BLOCKED_BY_PROVIDER`  | Review account access or wait for the provider limit to reset                                                                                                               |
-| `BROWSER_START_FAILED` | Install Chromium and close another process using the same Wrapper profile                                                                                                   |
-| `WORKER_RESTARTED`     | Review the previous task before submitting a new one; it was not replayed                                                                                                   |
-
-Terminal task history and unreferenced artifacts are pruned after the configured retention period. Browser credentials, logs and other runtime files remain until manually deleted. Stop the worker before deleting its data directory; deleting the profile requires a new sign-in. Image artifacts returned by `get_artifact` use standard MCP base64 image content; large artifacts may require authenticated HTTP retrieval.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development and [installation guide](docs/INSTALLATION.md) for credential handling. Licensed under the [GNU GPL v3](LICENSE).
-
-Live browser results and repeatable checks: [browser reliability](docs/BROWSER_RELIABILITY.md). Task duration and success-rate definitions: [observability](docs/OBSERVABILITY.md).
+Licensed under [GNU GPL v3](LICENSE).

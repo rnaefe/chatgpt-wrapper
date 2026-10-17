@@ -1,25 +1,27 @@
-# Priorities
+# Roadmap
 
-## 1. CLI installation
+The current public release is [0.4.2](https://github.com/rnaefe/chatgpt-wrapper/releases/tag/v0.4.2). The project focuses on a local browser worker and MCP, with Codex as the primary setup target.
 
-Implemented in 0.4.0: single-command setup, persistent npm runtime, Chromium installation, Codex configuration with backups, and login. Cursor and Claude Desktop configuration writers are also available.
+## Delivered
 
-Verified locally: clean tarball installation, preservation of unrelated Codex settings, actual Codex CLI recognition, and a packaged MCP handshake after removing the temporary bootstrap installation. Published `@rnaefe/chatgpt-wrapper@0.4.0` on 2026-10-17. A clean registry install, persistent runtime setup and seven-tool MCP handshake passed. The registry CLI reopened the saved visible session; a task through the existing Codex integration completed in 11.5 seconds.
+- CLI installation without cloning the repository or editing client config by hand.
+- Persistent versioned runtime, managed config backups, updates and config-only uninstall.
+- Visible sign-in and task windows that close after use; saved-profile reuse.
+- Durable SQLite tasks, cancellation, deadline handling and recovery without prompt replay.
+- Local duration metrics, error-code queries and configurable terminal-task retention.
+- Allowlisted file/URL image inputs, binary MCP image artifacts and bounded output validation.
+- npm distribution and isolated package installation/update/uninstall verification.
 
-## 2. Browser reliability
+Live visible coding tasks have passed on macOS. Headless was blocked by provider browser verification. Fault recovery is covered with controlled fixtures. See [browser reliability](BROWSER_RELIABILITY.md) for measured results and limits.
 
-Visible execution has previously completed a live MCP coding task. Headless execution has encountered a provider browser-verification screen. Package smoke tests do not access an account or claim to verify provider reliability.
+## Next
 
-Implemented: an explicitly invoked, sequential live MCP verification command and private outcome reports. On 2026-10-17, two visible probes passed; headless was blocked by browser verification before submission. See BROWSER_RELIABILITY.md. Cross-platform and extended-session acceptance remain unverified. Fault recovery is tested with controlled fixtures, without signing the user out or deliberately disrupting their network.
+1. Measure longer visible sessions and document reconnection behavior over time.
+2. Improve diagnostics for provider layout changes using small reproducible fixtures.
+3. Expand live image/attachment coverage without collecting private account data.
 
-## 3. Observability
+Windows/Linux acceptance remains unverified and is outside the current work. There are no support or delivery-date commitments for these items.
 
-Implemented: authenticated CLI/HTTP/MCP queries for duration distributions, success rate, outcome counts and recent error codes. Prompts and responses are excluded from metrics. See OBSERVABILITY.md for definitions. Terminal-task retention defaults to 30 days and is configurable. Alerts remain unimplemented.
+## Scope
 
-## 4. Release
-
-Version 0.4.2 adds default Codex onboarding, managed updates and uninstall. Fixture tests cover expired sessions, interrupted evaluation, window closure and recovery without replay. Platform acceptance remains excluded from this work.
-
-Version 0.4.1 is public on npm with on-demand browser windows. Its registry integrity matched the release artifact; clean registry installation, Codex config merge and the seven-tool MCP handshake passed on macOS.
-
-Standalone npm bundling, version metadata, changelog, installation docs and a package smoke test are implemented. Version 0.4.0 is public on npm; registry installation was verified on macOS. Cross-platform acceptance tests remain separate work. No CI workflow is included.
+Keep setup and MCP use simple. There is no dashboard, browser extension or CI workflow. Additional transports, providers and product surfaces need a concrete use case before implementation. Stealth, verification bypasses, private endpoints, automatic prompt retries and generated-code execution are outside the project scope.

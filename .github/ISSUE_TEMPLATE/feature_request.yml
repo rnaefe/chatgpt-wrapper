@@ -1,0 +1,17 @@
+name: Feature request
+description: Describe a problem and the behavior that would solve it.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the workflow and where it breaks down.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Include an example command or interaction, and alternatives you considered.
+    validations:
+      required: true

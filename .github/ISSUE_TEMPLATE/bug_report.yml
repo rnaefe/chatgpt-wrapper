@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible installation, browser or MCP problem.
+body:
+  - type: markdown
+    attributes:
+      value: "Use a small public example. Do not attach credentials, cookies, browser profiles, task databases or account screenshots. Report vulnerabilities privately through the Security tab."
+  - type: input
+    id: version
+    attributes:
+      label: Wrapper and Node versions
+      placeholder: "Wrapper 0.4.2; Node 24.x"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, MCP client and visible/headless mode. Do not include account details.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include the command or a harmless task example, expected behavior and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Error code and sanitized output
+      description: Review output locally before sharing. Never paste a token, private prompt or full runtime log.
+      render: text
+  - type: dropdown
+    id: verification
+    attributes:
+      label: Where did it happen?
+      options:
+        - Real ChatGPT session
+        - Local fixture or package test
+        - Installation before sign-in

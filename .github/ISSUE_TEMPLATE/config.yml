@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Installation and troubleshooting
+    url: https://github.com/rnaefe/chatgpt-wrapper/blob/main/docs/TROUBLESHOOTING.md
+    about: Check known setup, sign-in and worker errors first.
+  - name: Report a vulnerability privately
+    url: https://github.com/rnaefe/chatgpt-wrapper/security/advisories/new
+    about: Keep vulnerabilities and credentials out of public issues.

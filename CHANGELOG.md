@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add MCP usage and troubleshooting guides, contributor package map and GitHub reporting templates.
+- Refuse automatic replacement of malformed or relative runtime entries.
+- Correct README browser defaults and add package discovery/license metadata.
+
 ## 0.4.2 — 2026-10-17
 
 - Default to Codex setup, including when no command is supplied.
