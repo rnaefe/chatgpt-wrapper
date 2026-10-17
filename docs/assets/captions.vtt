@@ -1,7 +1,7 @@
 WEBVTT
 
 00:00:00.000 --> 00:00:04.000
-ChatGPT through MCP. Send work from your coding client and get code, analysis and images back.
+I hit my Codex usage limit, so I literally wrapped ChatGPT. Playwright for the browser, MCP for coding tools.
 
 00:00:04.000 --> 00:00:10.000
 A local bridge connects your MCP client, a durable SQLite queue and your saved ChatGPT browser session.
@@ -16,7 +16,7 @@ An actual image generated through Wrapper. Image delivery includes a local file 
 Six development task types: code generation, code review, reasoning, image generation, image analysis and image editing. Provider UI availability varies.
 
 00:00:30.000 --> 00:00:36.000
-Local fixture benchmark: median queue, validation and persistence improved from 244 to 1.7 milliseconds. Twelve samples; browser and provider time excluded.
+Install with one npm command, sign in to your own ChatGPT session, and use Wrapper from Codex. Node.js 24 or newer required.
 
 00:00:36.000 --> 00:00:40.000
-Build from source at github.com/rnaefe/chatgpt-wrapper. Requires Node.js 24 and your ChatGPT account. Sign-in and provider verification remain manual.
+ChatGPT Wrapper is open source at github.com/rnaefe/chatgpt-wrapper. Unofficial and experimental; provider verification can interrupt tasks.
