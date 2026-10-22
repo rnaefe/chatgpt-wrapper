@@ -14,7 +14,7 @@ The full setup and live coding workflow have been verified on macOS. Windows/Lin
 ## Codex: install in one command
 
 ```bash
-npx -y @rnaefe/chatgpt-wrapper@0.5.0
+npx -y @rnaefe/chatgpt-wrapper@0.6.0
 ```
 
 The installer sets up a persistent runtime and Chromium, creates or updates the `wrapper` MCP entry in Codex, and opens a browser for manual ChatGPT sign-in. It backs up an existing configuration before changing it.
@@ -36,10 +36,10 @@ Use the same installer, choosing a client:
 
 ```bash
 # Cursor
-npx -y @rnaefe/chatgpt-wrapper@0.5.0 setup --client cursor
+npx -y @rnaefe/chatgpt-wrapper@0.6.0 setup --client cursor
 
 # Claude Desktop
-npx -y @rnaefe/chatgpt-wrapper@0.5.0 setup --client claude-desktop
+npx -y @rnaefe/chatgpt-wrapper@0.6.0 setup --client claude-desktop
 ```
 
 | Client         | Default configuration                                                                                                            |
@@ -55,7 +55,7 @@ A matching managed Wrapper entry is upgraded in place; unrelated MCP entries are
 Preview the setup plan without changing files:
 
 ```bash
-npx -y @rnaefe/chatgpt-wrapper@0.5.0 setup --client codex --dry-run
+npx -y @rnaefe/chatgpt-wrapper@0.6.0 setup --client codex --dry-run
 ```
 
 To configure without signing in immediately, add `--skip-login`, then run `connect` when you're ready.

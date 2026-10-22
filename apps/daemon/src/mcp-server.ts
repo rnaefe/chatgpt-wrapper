@@ -3,6 +3,7 @@ import { z } from "zod";
 import { taskRequestSchema, statusSchema } from "@chatgpt-wrapper/contracts";
 
 import { deliverImage } from "./image-delivery.js";
+import { registerBatchTools } from "./batch-mcp.js";
 import { packageMetadata } from "./runtime-paths.js";
 import type { localClient } from "./local-client.js";
 function result(value: unknown) {
@@ -19,14 +20,14 @@ export function createMcpServer(
     },
     {
       instructions:
-        "Use submit_task once, keep its returned ID, and use wait_task until terminal. Do not resubmit slow or unconfirmed work. Include all source material in the objective or approved image inputs; Wrapper does not read the client's repository. Review returned code before applying it. For image results, retrieve each image artifact and include its displayMarkdown and downloadMarkdown in the final reply. NEEDS_AUTH and NEEDS_HUMAN require user attention; no automatic retry is made.",
+        "Use submit_task once, keep its returned ID, and use wait_task until terminal. Pass the last progress.revision as afterProgressRevision (0 for older tasks without progress) to receive stage changes early, and share meaningful progress.message updates with the user. Continue waiting after nonterminal updates; do not resubmit slow or unconfirmed work. Supply context inline or via explicit image/file attachments; local file paths require FILE_INPUT_ROOTS and no repository scan is performed. Use submit_batch once for independent jobs and keep its batch ID; use get_batch to collect results, and never wait on missingTaskIds removed by retention. Research uses research.search; share result.sources as links, without claiming independent source verification. Review returned code before applying it. For image results, retrieve each image artifact and include its displayMarkdown and downloadMarkdown in the final reply. NEEDS_AUTH and NEEDS_HUMAN require user attention; no automatic retry is made.",
     },
   );
   server.registerTool(
     "submit_task",
     {
       description:
-        "Queue a task and return its ID immediately. Use wait_task to await completion without repeated polling.",
+        "Queue a task and return its ID immediately. Use files for selected code/PDF/DOCX/text attachments (local paths require FILE_INPUT_ROOTS); research.search enables Search and returns source links. Optional model selects an exact visible ChatGPT model label; optional conversationId continues a prior result's conversation (not its task ID). Omit these for a new chat with the browser selection. Use wait_task; use submit_batch for multiple independent jobs.",
       inputSchema: taskRequestSchema,
     },
     async (request) => result(await (await api("/v1/tasks", request)).json()),
@@ -43,17 +44,23 @@ export function createMcpServer(
     "wait_task",
     {
       description:
-        "Wait up to 30 seconds for a task to reach a terminal state. Returns immediately if already terminal; on timeout returns its current state. Does not resubmit work.",
+        "Wait up to 30 seconds for a terminal state, or a newer progress revision when afterProgressRevision is supplied. Returns current state on timeout. Continue waiting after nonterminal stage updates; never resubmit work.",
       inputSchema: {
         id: z.string().uuid(),
         waitMs: z.number().int().min(0).max(30_000).default(30_000),
+        afterProgressRevision: z
+          .number()
+          .int()
+          .min(0)
+          .max(Number.MAX_SAFE_INTEGER)
+          .optional(),
       },
     },
-    async ({ id, waitMs }) =>
+    async ({ id, waitMs, afterProgressRevision }) =>
       result(
         await (
           await api(
-            `/v1/tasks/${id}/wait?waitMs=${waitMs}`,
+            `/v1/tasks/${id}/wait?waitMs=${waitMs}${afterProgressRevision === undefined ? "" : `&afterProgressRevision=${afterProgressRevision}`}`,
             undefined,
             waitMs + 5000,
           )
@@ -154,5 +161,6 @@ export function createMcpServer(
         await (await api(`/v1/errors?hours=${hours}&limit=${limit}`)).json(),
       ),
   );
+  registerBatchTools(server, api);
   return server;
 }

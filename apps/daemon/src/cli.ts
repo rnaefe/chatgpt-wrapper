@@ -24,6 +24,7 @@ Usage: chatgpt-wrapper <command> [options]
   uninstall                                  Remove Wrapper from the client; preserve saved data
   connect                                    Sign in using the visible browser
   mcp                                        Start the MCP stdio server
+  watch <task-id>                            Watch task status and progress until it finishes
   status                                     Show local worker and browser status
   metrics [--hours 24]                        Task success rates and duration percentiles
   errors [--hours 24] [--limit 20]             Recent task IDs and error codes
@@ -83,7 +84,13 @@ async function main() {
     console.log(help);
     return;
   }
-  if (positionals.length > 1)
+  if (command === "watch" && positionals.length !== 2)
+    throw new Error("Usage: chatgpt-wrapper watch <task-id>");
+  if (command === "watch") {
+    const { validateWatchTaskId } = await import("./task-watch.js");
+    validateWatchTaskId(positionals[1]);
+  }
+  if (command !== "watch" && positionals.length > 1)
     throw new Error("Unexpected arguments. Run chatgpt-wrapper --help.");
   if (values["data-dir"]) process.env.DATA_DIR = resolve(values["data-dir"]);
   if (values.port) {
@@ -272,6 +279,27 @@ async function main() {
     await installBrowser(packageRoot);
     const { connectBrowser } = await import("./browser-login.js");
     await connectBrowser(values["force-login"]);
+    return;
+  }
+  if (command === "watch") {
+    const { watchTask } = await import("./task-watch.js");
+    const controller = new AbortController();
+    const interrupt = () => controller.abort();
+    process.on("SIGINT", interrupt);
+    try {
+      const { localClient } = await import("./local-client.js");
+      const api = await localClient();
+      process.exitCode = await watchTask(positionals[1], {
+        api,
+        write: console.log,
+        signal: controller.signal,
+      });
+    } catch {
+      process.exitCode = controller.signal.aborted ? 130 : 1;
+      if (!controller.signal.aborted) console.error("Wrapper: WATCH_ERROR");
+    } finally {
+      process.removeListener("SIGINT", interrupt);
+    }
     return;
   }
   if (command === "metrics" || command === "errors") {

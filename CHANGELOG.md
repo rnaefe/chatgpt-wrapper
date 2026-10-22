@@ -1,6 +1,26 @@
 # Changelog
 
-## 0.5.0 — 2026-10-17
+## 0.6.0 — 2026-10-23
+
+- Exclude research citation icons from generated image downloads.
+- Confirm fresh replies across mixed message layouts and virtualized conversation history.
+- Support nested model pickers with separate thinking-effort controls and preserve inline Web search tokens during prompt entry.
+- Scope upload readiness to attachment controls, recognize provider filename suffixes, and protect existing unsent attachments.
+- Abort worker activity before waiting for transport shutdown, preventing queued work from starting during shutdown.
+
+- Attach selected project files, PDF and DOCX documents from explicit local roots or validated base64 inputs.
+- Submit durable atomic task batches and collect grouped results with `submit_batch` and `get_batch`.
+- Add `research.search` with visibly confirmed Search activation and structured source links.
+
+- Add optional exact visible model-label selection and UUID conversation continuity, with no fallback or automatic prompt retry when selection or conversation verification fails.
+- Return optional conversation IDs and URLs for follow-up tasks, and report the `selecting_model` progress stage.
+
+- Persist task progress stages and expose them through task snapshots and event history.
+- Add optional `afterProgressRevision` to MCP/HTTP waits for early stage updates while preserving terminal-only waiting by default.
+- Add `watch <task-id>` for private terminal progress tracking; Ctrl+C stops watching without cancelling work.
+- Bound combined image inputs to 20 MiB and stop oversized generated-image downloads during streaming.
+
+## 0.5.0 — 2026-10-17 (source milestone; not published to npm)
 
 - Add image analysis and editing, requiring image references and the appropriate output artifacts.
 - Wake the queue on committed task changes and add `wait_task` and `get_status` MCP tools.

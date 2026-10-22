@@ -41,9 +41,128 @@ afterEach(() => {
     .forEach((dir) => rmSync(dir, { recursive: true, force: true }));
 });
 describe.each([true, false])("worker lifecycle (headless=%s)", (headless) => {
+  it("reports image transfer stages only when images are present", async () => {
+    const { adapter } = setup(headless);
+    const progress = vi.fn();
+    const input = {
+      first: () => input,
+      nth: () => input,
+      count: vi.fn().mockResolvedValue(1),
+      getAttribute: vi.fn().mockResolvedValue("image/*"),
+      setInputFiles: vi.fn(),
+    };
+    const absent = { first: () => absent, count: vi.fn().mockResolvedValue(0) };
+    const page = {
+      goto: vi.fn(),
+      locator: (selector: string) =>
+        selector === 'input[type="file"]' ? input : absent,
+      waitForTimeout: vi.fn(),
+      exposeBinding: vi.fn(),
+      mainFrame: vi.fn(),
+      url: () => "https://chatgpt.com/",
+      evaluate: vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce({
+          value: {
+            text: "Done",
+            model: "ChatGPT",
+            images: [{ src: "blob:fixture" }],
+          },
+        })
+        .mockImplementation(async () => {
+          expect(progress.mock.calls.at(-1)).toEqual(["downloading_images"]);
+          return { data: "aW1hZ2U=", mime: "image/png" };
+        }),
+    };
+    input.setInputFiles.mockImplementation(async () => {
+      expect(progress.mock.calls.at(-1)).toEqual(["uploading_images"]);
+    });
+    mocks.launch.mockResolvedValue({
+      pages: () => [page],
+      close: vi.fn().mockResolvedValue(undefined),
+    });
+    const output = await adapter.execute(
+      {
+        ...request,
+        images: [
+          {
+            source: "base64",
+            name: "fixture.png",
+            mime: "image/png",
+            data: "aW1hZ2U=",
+          },
+        ],
+      },
+      new AbortController().signal,
+      progress,
+    );
+    expect(progress.mock.calls.map(([stage]) => stage)).toEqual([
+      "opening_browser",
+      "preparing_chat",
+      "uploading_images",
+      "downloading_images",
+    ]);
+    expect(output.images).toHaveLength(1);
+    expect(input.setInputFiles).toHaveBeenCalledOnce();
+  });
+  it("forwards only trusted page stages and ignores callbacks after cancellation", async () => {
+    const { adapter } = setup(headless);
+    const controller = new AbortController();
+    const frame = {};
+    let report: (source: { frame: unknown }, stage: string) => void = () => {};
+    const progress = vi.fn();
+    const page = {
+      exposeBinding: vi.fn(async (_name, callback) => {
+        report = callback;
+      }),
+      mainFrame: () => frame,
+      goto: vi.fn(),
+      url: () => "https://chatgpt.com/",
+      evaluate: vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockImplementation(async () => {
+          report({ frame: {} }, "waiting_response");
+          report({ frame }, "completed");
+          report({ frame }, "submitting_prompt");
+          report({ frame }, "waiting_response");
+          report({ frame }, "receiving_response");
+          controller.abort(new Error("cancelled"));
+          report({ frame }, "receiving_response");
+          throw new Error("closed");
+        }),
+    };
+    mocks.launch.mockImplementation(async () => {
+      expect(progress.mock.calls).toEqual([["opening_browser"]]);
+      return {
+        pages: () => [page],
+        close: vi.fn().mockResolvedValue(undefined),
+      };
+    });
+    page.goto.mockImplementation(async () => {
+      expect(progress.mock.calls.at(-1)).toEqual(["preparing_chat"]);
+    });
+    await expect(
+      adapter.execute(request, controller.signal, progress),
+    ).rejects.toThrow("cancelled");
+    expect(page.exposeBinding).toHaveBeenCalledWith(
+      "__wrapperReportProgress",
+      expect.any(Function),
+    );
+    expect(progress.mock.calls.map(([stage]) => stage)).toEqual([
+      "opening_browser",
+      "preparing_chat",
+      "submitting_prompt",
+      "waiting_response",
+      "receiving_response",
+    ]);
+  });
   it("uses a private persistent profile and returns completed output once", async () => {
     const { dir, adapter } = setup(headless);
     const page = {
+      exposeBinding: vi.fn(),
+      mainFrame: vi.fn(),
       goto: vi.fn(),
       url: () => "https://chatgpt.com/",
       evaluate: vi
@@ -81,7 +200,13 @@ describe.each([true, false])("worker lifecycle (headless=%s)", (headless) => {
       });
     mocks.launch.mockResolvedValue({
       pages: () => [
-        { goto: vi.fn(), url: () => "https://chatgpt.com/", evaluate },
+        {
+          exposeBinding: vi.fn(),
+          mainFrame: vi.fn(),
+          goto: vi.fn(),
+          url: () => "https://chatgpt.com/",
+          evaluate,
+        },
       ],
       close,
     });
@@ -111,7 +236,13 @@ describe.each([true, false])("worker lifecycle (headless=%s)", (headless) => {
       );
     mocks.launch.mockResolvedValue({
       pages: () => [
-        { goto: vi.fn(), url: () => "https://chatgpt.com/", evaluate },
+        {
+          exposeBinding: vi.fn(),
+          mainFrame: vi.fn(),
+          goto: vi.fn(),
+          url: () => "https://chatgpt.com/",
+          evaluate,
+        },
       ],
       close,
     });
@@ -127,6 +258,8 @@ it("closes visible sign-in and each task while preserving readiness", async () =
   const adapter = new PlaywrightAdapter(dir, join(dir, "engine.js"), false);
   const close = vi.fn().mockResolvedValue(undefined);
   const page = {
+    exposeBinding: vi.fn(),
+    mainFrame: vi.fn(),
     goto: vi.fn(),
     url: () => "https://chatgpt.com/",
     evaluate: vi.fn(async (fn: unknown, request?: unknown) =>
@@ -190,7 +323,13 @@ it.each([
       .fn()
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({ error });
-    const page = { goto: vi.fn(), url: () => "https://chatgpt.com/", evaluate };
+    const page = {
+      exposeBinding: vi.fn(),
+      mainFrame: vi.fn(),
+      goto: vi.fn(),
+      url: () => "https://chatgpt.com/",
+      evaluate,
+    };
     mocks.launch.mockResolvedValue({ pages: () => [page], close });
     await expect(
       adapter.execute(request, new AbortController().signal),
@@ -221,7 +360,13 @@ it("releases a visible profile after the user closes its window during evaluatio
     );
   mocks.launch.mockResolvedValue({
     pages: () => [
-      { goto: vi.fn(), url: () => "https://chatgpt.com/", evaluate },
+      {
+        exposeBinding: vi.fn(),
+        mainFrame: vi.fn(),
+        goto: vi.fn(),
+        url: () => "https://chatgpt.com/",
+        evaluate,
+      },
     ],
     close,
   });

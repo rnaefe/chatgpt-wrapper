@@ -1,9 +1,77 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { resolveImageInput } from "../src/browser-images.js";
+import {
+  downloadImages,
+  resolveImageInput,
+  uploadImages,
+} from "../src/browser-images.js";
+import type { Page } from "playwright";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
+});
+
+it("rejects combined attachments before touching the browser upload control", async () => {
+  const page = { locator: vi.fn() } as unknown as Page;
+  const image = {
+    source: "base64" as const,
+    data: Buffer.alloc(7 * 1024 * 1024).toString("base64"),
+    mime: "image/png",
+    name: "reference.png",
+  };
+  await expect(uploadImages(page, [image, image, image])).rejects.toMatchObject(
+    {
+      code: "IMAGE_INPUTS_TOO_LARGE",
+    },
+  );
+  expect(page.locator).not.toHaveBeenCalled();
+});
+
+// Run the actual serialized browser callback against controlled response streams.
+const imagePage = () =>
+  ({
+    evaluate: (callback: (argument: unknown) => unknown, argument: unknown) =>
+      callback(argument),
+  }) as unknown as Page;
+
+it("cancels oversized generated-image streams before reading the remainder", async () => {
+  const cancel = vi.fn();
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(10 * 1024 * 1024 + 1));
+    },
+    cancel,
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(body)),
+  );
+  await expect(
+    downloadImages(imagePage(), [{ src: "blob:generated" }]),
+  ).rejects.toThrow("Image exceeds 10 MiB");
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(body.locked).toBe(false);
+});
+
+it("preserves generated-image bytes across stream chunk boundaries", async () => {
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array([0, 128, 255]));
+      controller.enqueue(new Uint8Array([1, 2]));
+      controller.close();
+    },
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(body, { headers: { "content-type": "image/png" } }),
+    ),
+  );
+  const images = await downloadImages(imagePage(), [{ src: "blob:generated" }]);
+  expect(images[0].data).toEqual(Buffer.from([0, 128, 255, 1, 2]));
+  expect(images[0].mime).toBe("image/png");
+  expect(body.locked).toBe(false);
 });
 
 it("aborts an in-flight image download when the task is cancelled", async () => {

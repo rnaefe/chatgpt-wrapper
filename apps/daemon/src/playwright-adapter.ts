@@ -1,4 +1,7 @@
-import { capabilitySchema } from "@chatgpt-wrapper/contracts";
+import {
+  capabilitySchema,
+  progressStageSchema,
+} from "@chatgpt-wrapper/contracts";
 import {
   uploadImages,
   downloadImages,
@@ -6,6 +9,13 @@ import {
 } from "./browser-images.js";
 export { validateImagePath, validateImageUrl } from "./browser-images.js";
 import { inspectReadiness, waitForSignIn } from "./browser-onboarding.js";
+import { selectModel } from "./browser-models.js";
+import {
+  uploadAttachments,
+  assertNoPendingAttachments,
+} from "./browser-files.js";
+import { enableResearch } from "./browser-research.js";
+import { openConversation, readConversation } from "./browser-conversations.js";
 import type { WebRequest } from "./page-engine.js";
 import { mkdirSync, chmodSync } from "node:fs";
 import { join } from "node:path";
@@ -17,6 +27,7 @@ import {
   ProviderError,
   type Adapter,
   type AdapterOutput,
+  type ProgressReporter,
 } from "@chatgpt-wrapper/adapters";
 import type { TaskRequest, TaskStatus } from "@chatgpt-wrapper/contracts";
 
@@ -115,11 +126,19 @@ export class PlaywrightAdapter implements Adapter {
     return page;
   }
 
-  private async openTaskPage(context: BrowserContext) {
+  private async openTaskPage(
+    context: BrowserContext,
+    request: TaskRequest,
+    signal: AbortSignal,
+  ) {
     const page =
       typeof context.newPage === "function"
         ? await context.newPage()
         : context.pages()[0];
+    if (request.conversationId) {
+      await openConversation(page, request.conversationId, signal);
+      return page;
+    }
     await page.goto(CHATGPT_ORIGIN, {
       waitUntil: "domcontentloaded",
       timeout: NAVIGATION_TIMEOUT_MS,
@@ -130,21 +149,31 @@ export class PlaywrightAdapter implements Adapter {
 
   private async startNewConversation(page: Page) {
     if (typeof page.locator !== "function") return;
-    const newChat = page
-      .locator(
-        [
-          'button[aria-label*="new chat" i]',
-          'button[data-testid*="new-chat" i]',
-          '[role="button"][aria-label*="new chat" i]',
-          'button:has-text("New chat")',
-          'a:has-text("New chat")',
-          '[role="button"]:has-text("New chat")',
-        ].join(", "),
-      )
-      .first();
-    if (!(await newChat.count()) || !(await newChat.isVisible())) return;
-    await newChat.click();
-    await page.waitForTimeout(250);
+    const newChats = page.locator(
+      [
+        'button[aria-label*="new chat" i]',
+        'button[data-testid*="new-chat" i]',
+        '[role="button"][aria-label*="new chat" i]',
+        'button:has-text("New chat")',
+        'a:has-text("New chat")',
+        '[role="button"]:has-text("New chat")',
+      ].join(", "),
+    );
+    // The page can expose a hidden mobile control before the visible global
+    // action, plus project-specific actions that must not capture generic tasks.
+    for (const exact of [true, false]) {
+      for (let i = 0; i < (await newChats.count()); i++) {
+        const newChat = newChats.nth(i);
+        const aria = (await newChat.getAttribute("aria-label"))?.trim();
+        if (exact && aria?.toLowerCase() !== "new chat") continue;
+        if (aria && /^new chat in\b/i.test(aria)) continue;
+        if (!(await newChat.isVisible()) || !(await newChat.isEnabled()))
+          continue;
+        await newChat.click();
+        await page.waitForTimeout(250);
+        return;
+      }
+    }
   }
 
   private async verifyHeadlessConnection(
@@ -184,6 +213,8 @@ export class PlaywrightAdapter implements Adapter {
     page: Page,
     source: string,
     request: WebRequest,
+    onProgress?: ProgressReporter,
+    signal?: AbortSignal,
   ) {
     if (new URL(page.url()).origin !== CHATGPT_ORIGIN)
       throw new ProviderError(
@@ -192,6 +223,24 @@ export class PlaywrightAdapter implements Adapter {
         "NEEDS_AUTH",
       );
 
+    if (onProgress) {
+      await page.exposeBinding(
+        "__wrapperReportProgress",
+        ({ frame }, value: unknown) => {
+          if (signal?.aborted || frame !== page.mainFrame()) return;
+          const stage = progressStageSchema.safeParse(value);
+          if (
+            stage.success &&
+            [
+              "submitting_prompt",
+              "waiting_response",
+              "receiving_response",
+            ].includes(stage.data)
+          )
+            onProgress(stage.data);
+        },
+      );
+    }
     await page.evaluate(source + ";globalThis.WrapperPage=WrapperPage;");
     const result = await page.evaluate<PageResult, WebRequest>(
       async (pageRequest) => {
@@ -202,6 +251,7 @@ export class PlaywrightAdapter implements Adapter {
                 doc: Document,
                 request: unknown,
                 signal: AbortSignal,
+                options?: { onProgress?: (stage: string) => Promise<void> },
               ) => Promise<{ text: string; model: string }>;
             };
           }
@@ -212,6 +262,18 @@ export class PlaywrightAdapter implements Adapter {
               document,
               pageRequest,
               new AbortController().signal,
+              {
+                onProgress: async (stage) => {
+                  const report = (
+                    window as unknown as {
+                      __wrapperReportProgress?: (
+                        stage: string,
+                      ) => Promise<void>;
+                    }
+                  ).__wrapperReportProgress;
+                  if (report) await report(stage);
+                },
+              },
             ),
           };
         } catch (error) {
@@ -299,6 +361,7 @@ export class PlaywrightAdapter implements Adapter {
   async execute(
     request: TaskRequest,
     signal: AbortSignal,
+    onProgress?: ProgressReporter,
   ): Promise<AdapterOutput> {
     if (!capabilities.includes(request.capability))
       throw new ProviderError(
@@ -322,26 +385,67 @@ export class PlaywrightAdapter implements Adapter {
     signal.addEventListener("abort", abort, { once: true });
     try {
       const source = await this.loadEngine();
+      onProgress?.("opening_browser");
       context = await openProfile(
         profileDirectory(this.directory),
         this.headless,
       );
       this.taskContext = context;
       if (signal.aborted) throw signal.reason;
-      taskPage = await this.openTaskPage(context);
-      const images = await uploadImages(taskPage, request.images, signal);
-      const result = await this.evaluateRequest(taskPage, source, {
-        ...request,
-        images,
-      });
+      onProgress?.("preparing_chat");
+      taskPage = await this.openTaskPage(context, request, signal);
+      await assertNoPendingAttachments(taskPage);
+      let selectedModel: string | undefined;
+      if (request.model) {
+        onProgress?.("selecting_model");
+        selectedModel = await selectModel(taskPage, request.model, signal);
+      }
+      if (request.capability === "research.search") {
+        onProgress?.("preparing_research");
+        await enableResearch(taskPage, signal);
+      }
+      if (request.files?.length) onProgress?.("uploading_files");
+      else if (request.images?.length) onProgress?.("uploading_images");
+      const attachments = request.files?.length
+        ? await uploadAttachments(
+            taskPage,
+            request.images,
+            request.files,
+            signal,
+          )
+        : {
+            images: await uploadImages(taskPage, request.images, signal),
+            files: [],
+          };
+      // Attachment controls may rerender the composer and reset the active tool.
+      if (request.capability === "research.search")
+        await enableResearch(taskPage, signal);
+      const result = await this.evaluateRequest(
+        taskPage,
+        source,
+        {
+          ...request,
+          images: attachments.images,
+          files: attachments.files,
+        },
+        onProgress,
+        signal,
+      );
+      if (result.images?.length) onProgress?.("downloading_images");
       const outputImages = await downloadImages(taskPage, result.images);
+      const conversation = await readConversation(
+        taskPage,
+        request.conversationId,
+        signal,
+      );
       this.state = "READY";
       this.message = "ChatGPT connected. Last task completed.";
       return {
         text: result.text,
-        model: result.model,
+        model: selectedModel ?? result.model,
         images: outputImages,
         adapter: "chatgpt-playwright",
+        ...conversation,
       };
     } catch (error) {
       this.state =

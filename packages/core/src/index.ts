@@ -11,7 +11,11 @@ import {
 import { join } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import {
+  taskRequestSchema,
   terminalStatuses,
+  progressMessages,
+  progressStageSchema,
+  type ProgressStage,
   type Task,
   type TaskRequest,
   type TaskStatus,
@@ -34,6 +38,16 @@ const ALLOWED_TRANSITIONS: Partial<Record<TaskStatus, TaskStatus[]>> = {
   ],
   VALIDATING: ["COMPLETED", "FAILED", "CANCELLED"],
 };
+
+export interface BatchSnapshot {
+  id: string;
+  createdAt: string;
+  taskIds: string[];
+  tasks: Task[];
+  counts: Record<string, number>;
+  terminal: boolean;
+  missingTaskIds: string[];
+}
 
 export class ConflictError extends Error {}
 
@@ -70,6 +84,7 @@ export class Store {
       CREATE INDEX IF NOT EXISTS tasks_created ON tasks(created);
       CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, body TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS batches (id TEXT PRIMARY KEY, created TEXT NOT NULL, task_ids TEXT NOT NULL, key TEXT UNIQUE, fingerprint TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS events_task ON events(task_id, seq);`);
   }
   get(id: string): Task | undefined {
@@ -98,59 +113,163 @@ export class Store {
         .map((r) => [String(r.status), Number(r.n)]),
     );
   }
-  submit(request: TaskRequest): { task: Task; reused: boolean } {
+  private insertTask(request: TaskRequest): { task: Task; reused: boolean } {
     const fingerprint = createHash("sha256")
-      .update(JSON.stringify({ ...request, idempotencyKey: undefined }))
+      .update(
+        JSON.stringify({
+          ...request,
+          files: request.files?.length ? request.files : undefined,
+          idempotencyKey: undefined,
+        }),
+      )
       .digest("hex");
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      if (request.idempotencyKey) {
-        const row = this.db
-          .prepare("SELECT body,fingerprint FROM tasks WHERE key=?")
-          .get(request.idempotencyKey);
-        if (row) {
-          if (row.fingerprint !== fingerprint)
-            throw new ConflictError(
-              "Idempotency key already used with different input",
-            );
-          this.db.exec("COMMIT");
-          return { task: JSON.parse(String(row.body)), reused: true };
-        }
+    if (request.idempotencyKey) {
+      const row = this.db
+        .prepare("SELECT body,fingerprint FROM tasks WHERE key=?")
+        .get(request.idempotencyKey);
+      if (row) {
+        if (row.fingerprint !== fingerprint)
+          throw new ConflictError(
+            "Idempotency key already used with different input",
+          );
+        return { task: JSON.parse(String(row.body)), reused: true };
       }
-      const now = new Date().toISOString();
-      const task: Task = {
-        id: randomUUID(),
-        status: "QUEUED",
-        request,
-        createdAt: now,
-        updatedAt: now,
-      };
-      this.db
-        .prepare("INSERT INTO tasks VALUES (?,?,?,?,?,?)")
-        .run(
-          task.id,
-          task.status,
-          JSON.stringify(task),
-          request.idempotencyKey ?? null,
-          fingerprint,
-          now,
-        );
-      this.recordEvent(task, "Submitted");
-      this.db.exec("COMMIT");
-      this.notify(task);
-      return { task, reused: false };
-    } catch (e) {
-      this.db.exec("ROLLBACK");
-      throw e;
     }
-  }
-  private recordEvent(task: Task, detail?: string) {
+    const now = new Date().toISOString();
+    const task: Task = {
+      id: randomUUID(),
+      status: "QUEUED",
+      request,
+      createdAt: now,
+      updatedAt: now,
+      progress: {
+        stage: "queued",
+        message: progressMessages.queued,
+        updatedAt: now,
+        revision: 0,
+      },
+    };
     this.db
-      .prepare("INSERT INTO events(task_id,body) VALUES (?,?)")
+      .prepare("INSERT INTO tasks VALUES (?,?,?,?,?,?)")
       .run(
         task.id,
-        JSON.stringify({ status: task.status, at: task.updatedAt, detail }),
+        task.status,
+        JSON.stringify(task),
+        request.idempotencyKey ?? null,
+        fingerprint,
+        now,
       );
+    this.recordEvent(task, "Submitted");
+    return { task, reused: false };
+  }
+  submit(request: TaskRequest): { task: Task; reused: boolean } {
+    this.db.exec("BEGIN IMMEDIATE");
+    let result: { task: Task; reused: boolean };
+    try {
+      result = this.insertTask(request);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    if (!result.reused) this.notify(result.task);
+    return result;
+  }
+  submitBatch(request: {
+    tasks: TaskRequest[];
+    idempotencyKey?: string;
+  }): BatchSnapshot & { reused: boolean } {
+    if (!request.tasks.length || request.tasks.length > 20)
+      throw new Error("Batch must contain between 1 and 20 tasks");
+    if (
+      request.idempotencyKey !== undefined &&
+      (!request.idempotencyKey.length || request.idempotencyKey.length > 200)
+    )
+      throw new Error("Invalid batch idempotency key");
+    const tasks = request.tasks.map((task) => taskRequestSchema.parse(task));
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify(tasks))
+      .digest("hex");
+    const inserted: Task[] = [];
+    let id: string;
+    let reused = false;
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const existing = request.idempotencyKey
+        ? this.db
+            .prepare("SELECT id,fingerprint FROM batches WHERE key=?")
+            .get(request.idempotencyKey)
+        : undefined;
+      if (existing) {
+        if (existing.fingerprint !== fingerprint)
+          throw new ConflictError(
+            "Batch idempotency key already used with different input",
+          );
+        id = String(existing.id);
+        reused = true;
+      } else {
+        id = randomUUID();
+        const taskIds = tasks.map((task) => {
+          const result = this.insertTask(task);
+          if (!result.reused) inserted.push(result.task);
+          return result.task.id;
+        });
+        this.db
+          .prepare("INSERT INTO batches VALUES (?,?,?,?,?)")
+          .run(
+            id,
+            new Date().toISOString(),
+            JSON.stringify(taskIds),
+            request.idempotencyKey ?? null,
+            fingerprint,
+          );
+      }
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    for (const task of inserted) this.notify(task);
+    return { ...this.getBatch(id)!, reused };
+  }
+  getBatch(id: string): BatchSnapshot | undefined {
+    const row = this.db
+      .prepare("SELECT created,task_ids FROM batches WHERE id=?")
+      .get(id);
+    if (!row) return undefined;
+    const taskIds = JSON.parse(String(row.task_ids)) as string[];
+    const tasks: Task[] = [];
+    const missingTaskIds: string[] = [];
+    const counts: Record<string, number> = {};
+    for (const taskId of taskIds) {
+      const task = this.get(taskId);
+      if (task) {
+        tasks.push(task);
+        counts[task.status] = (counts[task.status] ?? 0) + 1;
+      } else missingTaskIds.push(taskId);
+    }
+    return {
+      id,
+      createdAt: String(row.created),
+      taskIds,
+      tasks,
+      counts,
+      missingTaskIds,
+      terminal:
+        missingTaskIds.length === 0 &&
+        tasks.every((task) => terminalStatuses.includes(task.status)),
+    };
+  }
+  private recordEvent(task: Task, detail?: string) {
+    this.db.prepare("INSERT INTO events(task_id,body) VALUES (?,?)").run(
+      task.id,
+      JSON.stringify({
+        status: task.status,
+        at: task.updatedAt,
+        detail,
+        progress: task.progress,
+      }),
+    );
   }
   events(id: string): TaskEvent[] {
     return this.db
@@ -175,6 +294,16 @@ export class Store {
       ...patch,
       status,
       updatedAt: now,
+      ...(status === "COMPLETED"
+        ? {
+            progress: {
+              stage: "completed" as const,
+              message: progressMessages.completed,
+              updatedAt: now,
+              revision: (task.progress?.revision ?? 0) + 1,
+            },
+          }
+        : {}),
       ...(status === "RUNNING" ? { startedAt: now } : {}),
       ...(terminalStatuses.includes(status) ? { finishedAt: now } : {}),
     };
@@ -190,6 +319,44 @@ export class Store {
     } catch (e) {
       this.db.exec("ROLLBACK");
       throw e;
+    }
+    this.notify(updated);
+    return updated;
+  }
+  /** Progress and its event are committed together before subscribers are notified. */
+  reportProgress(id: string, stage: ProgressStage): Task | undefined {
+    progressStageSchema.parse(stage);
+    this.db.exec("BEGIN IMMEDIATE");
+    let updated: Task;
+    try {
+      const task = this.get(id);
+      if (
+        !task ||
+        terminalStatuses.includes(task.status) ||
+        task.progress?.stage === stage
+      ) {
+        this.db.exec("COMMIT");
+        return task;
+      }
+      const now = new Date().toISOString();
+      updated = {
+        ...task,
+        updatedAt: now,
+        progress: {
+          stage,
+          message: progressMessages[stage],
+          updatedAt: now,
+          revision: (task.progress?.revision ?? 0) + 1,
+        },
+      };
+      this.db
+        .prepare("UPDATE tasks SET body=? WHERE id=?")
+        .run(JSON.stringify(updated), id);
+      this.recordEvent(updated, updated.progress!.message);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
     }
     this.notify(updated);
     return updated;
@@ -313,6 +480,14 @@ export class Store {
       for (const row of expired) {
         deleteEvents.run(row.id);
         deleteTask.run(row.id);
+      }
+      // Retain partial batches so clients can see precisely which tasks expired.
+      for (const row of this.db
+        .prepare("SELECT id,task_ids FROM batches")
+        .all()) {
+        const ids = JSON.parse(String(row.task_ids)) as string[];
+        if (ids.every((id) => !this.get(id)))
+          this.db.prepare("DELETE FROM batches WHERE id=?").run(row.id);
       }
       const referenced = new Set<string>();
       for (const row of this.db.prepare("SELECT body FROM tasks").all()) {

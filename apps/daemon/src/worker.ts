@@ -1,6 +1,10 @@
 import { Store } from "@chatgpt-wrapper/core";
 import { ProviderError, type Adapter } from "@chatgpt-wrapper/adapters";
-import { validateImages, validateText } from "@chatgpt-wrapper/validation";
+import {
+  validateImages,
+  validateText,
+  extractResearchSources,
+} from "@chatgpt-wrapper/validation";
 import type { Task, TaskStatus } from "@chatgpt-wrapper/contracts";
 
 export class Worker {
@@ -103,6 +107,10 @@ export class Worker {
       const output = await this.adapter.execute(
         task.request,
         controller.signal,
+        (stage) => {
+          if (!controller.signal.aborted)
+            this.store.reportProgress(task.id, stage);
+        },
       );
       if (controller.signal.aborted) return this.failAborted(task.id);
       if (this.store.get(task.id)?.status === "CANCELLED") return;
@@ -112,8 +120,10 @@ export class Worker {
         {},
         "Validating provider output",
       );
+      this.store.reportProgress(task.id, "validating");
       const checks = validateText(output.text, task.request);
       const imageChecks = validateImages(output.images ?? [], task.request);
+      this.store.reportProgress(task.id, "saving_result");
       const artifacts = [
         ...(output.text.trim()
           ? [
@@ -135,8 +145,17 @@ export class Worker {
         {
           result: {
             text: output.text,
+            ...(task.request.capability === "research.search"
+              ? { sources: extractResearchSources(output.text) }
+              : {}),
             artifacts,
             provenance: { adapter: output.adapter, model: output.model },
+            ...(output.conversationId
+              ? {
+                  conversationId: output.conversationId,
+                  conversationUrl: output.conversationUrl,
+                }
+              : {}),
             validation: { passed: true, checks: [...checks, ...imageChecks] },
           },
         },

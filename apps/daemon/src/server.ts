@@ -1,10 +1,15 @@
 import { waitForTask } from "./task-wait.js";
+import { registerBatchRoutes } from "./batch-routes.js";
 import { packageMetadata } from "./runtime-paths.js";
 import { PlaywrightAdapter } from "./playwright-adapter.js";
 import Fastify from "fastify";
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import { taskRequestSchema, statusSchema } from "@chatgpt-wrapper/contracts";
+import {
+  taskRequestSchema,
+  statusSchema,
+  MAX_TASK_BODY_BYTES,
+} from "@chatgpt-wrapper/contracts";
 import { ConflictError, type Store } from "@chatgpt-wrapper/core";
 import type { Worker } from "./worker.js";
 
@@ -18,7 +23,7 @@ export function createServer(options: {
   const waitingClients = new Set<AbortController>();
   const server = Fastify({
     logger: options.logger ?? false,
-    bodyLimit: 29 * 1024 * 1024,
+    bodyLimit: MAX_TASK_BODY_BYTES,
   });
   server.addHook("preClose", async () => {
     for (const controller of waitingClients) controller.abort();
@@ -184,6 +189,12 @@ export function createServer(options: {
       const query = z
         .object({
           waitMs: z.coerce.number().int().min(0).max(30_000).default(30_000),
+          afterProgressRevision: z
+            .preprocess(
+              (value) => (value === "" ? Number.NaN : value),
+              z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+            )
+            .optional(),
         })
         .safeParse(req.query);
       if (!id.success || !query.success)
@@ -198,6 +209,7 @@ export function createServer(options: {
           id.data,
           query.data.waitMs,
           controller.signal,
+          query.data.afterProgressRevision,
         );
         return task
           ? { ...task, events: store.events(task.id) }
@@ -229,5 +241,6 @@ export function createServer(options: {
         .send(store.artifactData(artifact.id));
     },
   );
+  registerBatchRoutes(server, store);
   return server;
 }

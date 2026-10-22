@@ -7,14 +7,14 @@ export function waitForTask(
   id: string,
   waitMs: number,
   signal?: AbortSignal,
+  afterProgressRevision?: number,
 ): Promise<Task | undefined> {
+  const changed = (task: Task) =>
+    terminalStatuses.includes(task.status) ||
+    (afterProgressRevision !== undefined &&
+      (task.progress?.revision ?? 0) > afterProgressRevision);
   const current = store.get(id);
-  if (
-    !current ||
-    terminalStatuses.includes(current.status) ||
-    !waitMs ||
-    signal?.aborted
-  )
+  if (!current || changed(current) || !waitMs || signal?.aborted)
     return Promise.resolve(current);
   return new Promise((resolve) => {
     const finish = (task: Task | undefined) => {
@@ -24,8 +24,7 @@ export function waitForTask(
       resolve(task);
     };
     const unsubscribe = store.onTaskChange((task) => {
-      if (task.id === id && terminalStatuses.includes(task.status))
-        finish(task);
+      if (task.id === id && changed(task)) finish(task);
     });
     const timer = setTimeout(() => finish(store.get(id)), waitMs);
     const abort = () => finish(store.get(id));

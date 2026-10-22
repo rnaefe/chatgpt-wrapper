@@ -43,6 +43,16 @@ Inspect it with `get_task` or `list_errors`. `WORKER_RESTARTED`, `WORKER_STOPPED
 
 `VALIDATION_FAILED` can mean the provider returned plain prose for a code-generation request, an unsafe diff path or an oversized result. Ask for an explicit code block or use `reason.analyze` for prose analysis.
 
+## Existing text or attachments block a task
+
+`UNSENT_DRAFT` and `UNSENT_ATTACHMENTS` mean the target composer already contains unsent user material. Wrapper leaves it intact and does not send it with a new task. Review the saved browser profile manually, save or clear that draft yourself, then explicitly submit a new task. A failed upload can leave draft attachment cards; remove them manually before continuing that conversation. There is no automatic retry or draft deletion.
+
+## Document inputs or research are unavailable
+
+Local document/source paths require absolute directories in `FILE_INPUT_ROOTS` in the worker environment; restart the worker after changing it. Images still use `IMAGE_INPUT_ROOTS`. MIME/extension checks and basic PDF/DOCX header validation happen before upload. `ATTACHMENT_UPLOAD_FAILED` stops before prompt submission when upload completion cannot be confirmed.
+
+`RESEARCH_UNAVAILABLE` means Search could not be visibly selected. Review the account's tools in the visible browser. Ordinary analysis is not substituted silently. Research source extraction checks link syntax, not claim accuracy.
+
 ## Image inputs are rejected
 
 Image file paths need an explicit trusted absolute root in `IMAGE_INPUT_ROOTS`; symlink escapes are rejected. URL inputs need an exact trusted host in `ALLOWED_IMAGE_HOSTS`; redirects and nonstandard ports are rejected. See [security](SECURITY.md) before broadening an allowlist.

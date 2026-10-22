@@ -1,6 +1,7 @@
 import { promptFor, type WebRequest } from "./task-prompts.js";
 export { promptFor, type WebRequest } from "./task-prompts.js";
 import { markdown } from "./page-markdown.js";
+import type { ProgressStage } from "@chatgpt-wrapper/contracts";
 export { markdown } from "./page-markdown.js";
 
 export type BrowserErrorState =
@@ -145,27 +146,52 @@ const pause = (ms: number, signal: AbortSignal) =>
     signal.addEventListener("abort", abort, { once: true });
   });
 function messageNodes(doc: Document, role: "user" | "assistant"): Element[] {
-  const primary = Array.from(
-    doc.querySelectorAll(`[data-message-author-role="${role}"]`),
+  // Provider layouts can coexist while old turns hydrate or a new tool turn mounts.
+  // Union their markers, counting a nested representation of one turn only once.
+  const selector = `[data-message-author-role="${role}"], [data-chatgpt-search-unit-key$=":${role}"], [data-turn-role="${role}"], [data-turn="${role}"], [data-message-role="${role}"]`;
+  return Array.from(doc.querySelectorAll(selector)).filter(
+    (node) => !node.parentElement?.closest(selector),
   );
-  if (primary.length) return primary;
-  const current = Array.from(
-    doc.querySelectorAll(`[data-chatgpt-search-unit-key$=":${role}"]`),
-  );
-  return current.length
-    ? current
-    : Array.from(
-        doc.querySelectorAll(
-          `[data-turn-role="${role}"], [data-turn="${role}"], [data-message-role="${role}"]`,
-        ),
-      );
 }
+function messageIdentity(node: Element): string | undefined {
+  const identityNode = node.closest(
+    "[data-message-id], [data-turn-id], [data-chatgpt-search-unit-key]",
+  );
+  if (!identityNode) return undefined;
+  for (const attribute of [
+    "data-message-id",
+    "data-turn-id",
+    "data-chatgpt-search-unit-key",
+  ]) {
+    const value = identityNode.getAttribute(attribute)?.trim();
+    if (value) return `${attribute}:${value}`;
+  }
+}
+function messageIdentities(nodes: Set<Element>): Set<string> {
+  return new Set(
+    Array.from(nodes, messageIdentity).filter(
+      (id): id is string => id !== undefined,
+    ),
+  );
+}
+
 function echoesPrompt(node: Element, prompt: string): boolean {
-  const body =
-    node.querySelector('[data-testid="user-message"], .whitespace-pre-wrap') ??
-    node;
-  const text = (body as HTMLElement).innerText ?? markdown(body);
-  return normalize(text).includes(normalize(prompt));
+  const expected = normalize(prompt);
+  // Inline tool tokens can split the prompt across multiple pre-wrap descendants.
+  // The complete user turn must echo the full envelope, never just its prefix.
+  const bodies = [
+    ...Array.from(
+      node.querySelectorAll(
+        '[data-testid="user-message"], .whitespace-pre-wrap',
+      ),
+    ),
+    node,
+  ];
+  return bodies.some((body) =>
+    normalize((body as HTMLElement).innerText ?? markdown(body)).includes(
+      expected,
+    ),
+  );
 }
 
 function isWrapperDraft(text: string): boolean {
@@ -196,12 +222,29 @@ export async function executeInPage(
   doc: Document,
   request: WebRequest,
   signal: AbortSignal,
-  options: { pollMs?: number; stableMs?: number; readyTimeoutMs?: number } = {},
+  options: {
+    pollMs?: number;
+    stableMs?: number;
+    readyTimeoutMs?: number;
+    onProgress?: (stage: ProgressStage) => void | Promise<void>;
+  } = {},
 ): Promise<{
   text: string;
   model: string;
   images: Array<{ src: string; mime?: string }>;
 }> {
+  const assertConversation = () => {
+    if (
+      request.conversationId &&
+      doc.location.href !== `https://chatgpt.com/c/${request.conversationId}`
+    )
+      throw new PageError(
+        "CONVERSATION_CHANGED",
+        "The browser changed away from the requested conversation. No replacement conversation will be used.",
+        "NEEDS_HUMAN",
+      );
+  };
+  assertConversation();
   const pollMs = options.pollMs ?? DEFAULT_POLL_INTERVAL_MS;
   const stableMs = options.stableMs ?? DEFAULT_STABLE_INTERVAL_MS;
   const readyDeadline =
@@ -226,10 +269,23 @@ export async function executeInPage(
       "The Wrapper tab is already generating. Wait for it to finish.",
       "NEEDS_HUMAN",
     );
+  const searchPill =
+    request.capability === "research.search"
+      ? composer.querySelector(
+          '[data-inline-selection-pill][data-system-hint-type="search"][contenteditable="false"]',
+        )
+      : null;
+  const draftContent = composer.cloneNode(true) as HTMLElement;
+  if (searchPill)
+    draftContent
+      .querySelectorAll(
+        '[data-inline-selection-pill][data-system-hint-type="search"][contenteditable="false"]',
+      )
+      .forEach((pill) => pill.remove());
   const draftText =
     composer instanceof doc.defaultView!.HTMLTextAreaElement
       ? composer.value
-      : (composer.textContent ?? "");
+      : (draftContent.textContent ?? "");
   if (draftText.trim() && isWrapperDraft(draftText)) clearDraft(composer, doc);
   else if (draftText.trim())
     throw new PageError(
@@ -239,8 +295,18 @@ export async function executeInPage(
     );
   const oldUsers = new Set(messageNodes(doc, "user"));
   const oldAssistants = new Set(messageNodes(doc, "assistant"));
+  const oldUserIdentities = messageIdentities(oldUsers);
+  const oldAssistantIdentities = messageIdentities(oldAssistants);
   const prompt = promptFor(request);
   composer.focus();
+  if (searchPill) {
+    const range = doc.createRange();
+    range.selectNodeContents(composer);
+    range.collapse(false);
+    const selection = doc.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
   if (composer instanceof doc.defaultView!.HTMLTextAreaElement) {
     const set = Object.getOwnPropertyDescriptor(
       doc.defaultView!.HTMLTextAreaElement.prototype,
@@ -251,6 +317,12 @@ export async function executeInPage(
     typeof doc.execCommand !== "function" ||
     !doc.execCommand("insertText", false, prompt)
   ) {
+    if (searchPill)
+      throw new PageError(
+        "RESEARCH_UNAVAILABLE",
+        "The browser could not insert the task while preserving the active Search tool.",
+        "NEEDS_HUMAN",
+      );
     const paragraphs = prompt.split("\n").map((line) => {
       const p = doc.createElement("p");
       p.textContent = line || "";
@@ -290,6 +362,9 @@ export async function executeInPage(
     else await pause(pollMs, signal);
   }
   if (signal.aborted) throw signal.reason ?? new Error("Cancelled");
+  await options.onProgress?.("submitting_prompt");
+  if (signal.aborted) throw signal.reason ?? new Error("Cancelled");
+  assertConversation();
   const form = composer.closest("form");
   if (
     form &&
@@ -302,18 +377,30 @@ export async function executeInPage(
   let previous = "";
   let stableAt = Date.now();
   let sawUserAt = 0;
+  let receiving = false;
   const deadline = Date.now() + request.timeoutSeconds * 1000;
   try {
     while (Date.now() < deadline) {
       if (signal.aborted) throw signal.reason ?? new Error("Cancelled");
+      assertConversation();
       const problem = pageProblem(doc);
       if (problem) throw problem;
       if (!user) {
-        user = messageNodes(doc, "user").find(
-          (n) => !oldUsers.has(n) && echoesPrompt(n, prompt),
-        );
-        if (user) sawUserAt = Date.now();
-        else if (Date.now() > sendDeadline + USER_TURN_CONFIRMATION_GRACE_MS)
+        user = messageNodes(doc, "user").find((n, index) => {
+          if (!echoesPrompt(n, prompt)) return false;
+          const identity = messageIdentity(n);
+          // Virtualized history can shrink after submission. An unseen stable
+          // turn identity establishes freshness without a DOM-count threshold.
+          // With no identity, retain the conservative positional check so a
+          // rerendered historical copy of this same envelope cannot confirm it.
+          return identity !== undefined
+            ? !oldUserIdentities.has(identity)
+            : !oldUsers.has(n) && index >= oldUsers.size;
+        });
+        if (user) {
+          sawUserAt = Date.now();
+          await options.onProgress?.("waiting_response");
+        } else if (Date.now() > sendDeadline + USER_TURN_CONFIRMATION_GRACE_MS)
           throw new PageError(
             "SUBMISSION_UNCONFIRMED",
             `Could not confirm the submitted prompt (user turns: ${messageNodes(doc, "user").length}, assistant turns: ${messageNodes(doc, "assistant").length}). It will not be sent again automatically.`,
@@ -321,10 +408,15 @@ export async function executeInPage(
           );
       }
       if (user) {
-        const responses = messageNodes(doc, "assistant").filter(
-          (n) =>
-            !oldAssistants.has(n) && !!(user!.compareDocumentPosition(n) & 4),
-        );
+        const responses = messageNodes(doc, "assistant").filter((n) => {
+          const identity = messageIdentity(n);
+          return (
+            (identity === undefined
+              ? !oldAssistants.has(n)
+              : !oldAssistantIdentities.has(identity)) &&
+            !!(user!.compareDocumentPosition(n) & 4)
+          );
+        });
         const imageResponses = producesImage(request.capability)
           ? Array.from(
               doc.querySelectorAll(
@@ -351,11 +443,45 @@ export async function executeInPage(
           imageResponses.at(-1) ??
           generatedImage?.parentElement) as Element | undefined;
         if (response) {
-          const text = markdown(
+          let text = markdown(
             response.querySelector(
               '[data-markdown-text-style="assistant-message"], .markdown, .prose',
             ) ?? response,
           );
+          if (request.capability === "research.search") {
+            const seen = new Set<string>();
+            const links: string[] = [];
+            for (const anchor of Array.from(
+              response.querySelectorAll("a[href]"),
+            )) {
+              const href = (anchor as HTMLAnchorElement).href;
+              if (
+                !/^https?:\/\//i.test(href) ||
+                href.length > 2048 ||
+                seen.has(href)
+              )
+                continue;
+              try {
+                const url = new URL(href);
+                if (url.username || url.password) continue;
+                seen.add(href);
+                const title =
+                  (
+                    anchor.getAttribute("aria-label") ||
+                    anchor.textContent ||
+                    url.hostname
+                  )
+                    .replace(/[\[\]\r\n\x00-\x1f]/g, " ")
+                    .trim()
+                    .slice(0, 500) || url.hostname;
+                if (!text.includes(href)) links.push(`- [${title}](<${href}>)`);
+                if (seen.size >= 50) break;
+              } catch {
+                /* Invalid provider links are omitted. */
+              }
+            }
+            if (links.length) text += "\n\nSources:\n" + links.join("\n");
+          }
           const turn =
             response.closest(
               '[data-talvt-turn-state], article, [data-testid^="conversation-turn"]',
@@ -363,13 +489,13 @@ export async function executeInPage(
             response.parentElement ??
             response;
           const turnState = turn.getAttribute("data-talvt-turn-state");
-          const images = Array.from(
-            response.querySelectorAll("img"),
-            (image) => ({
-              src: image.currentSrc || image.src,
-              mime: image.getAttribute("type") ?? undefined,
-            }),
-          ).filter((image) => image.src);
+          const images =
+            request.capability === "research.search"
+              ? []
+              : Array.from(response.querySelectorAll("img"), (image) => ({
+                  src: image.currentSrc || image.src,
+                  mime: image.getAttribute("type") ?? undefined,
+                })).filter((image) => image.src);
           const signature = JSON.stringify([
             text,
             images.map((image) => image.src),
@@ -379,6 +505,10 @@ export async function executeInPage(
             stableAt = Date.now();
           }
           const hasGeneratedImage = images.length > 0;
+          if (!receiving && (text || hasGeneratedImage)) {
+            receiving = true;
+            await options.onProgress?.("receiving_response");
+          }
           const idle =
             (!turnState || turnState === "complete") &&
             firstVisible(doc, stopSelector) === null &&
@@ -404,13 +534,16 @@ export async function executeInPage(
             Date.now() - stableAt >= stableMs &&
             Date.now() - sawUserAt >= stableMs
           ) {
+            const selectorLabel = firstVisible(
+              doc,
+              '[data-testid="model-switcher-dropdown-button"], [data-testid="model-switcher"], [aria-label="Select ChatGPT model"]',
+            )
+              ?.textContent?.trim()
+              .slice(0, 150);
             const model =
-              firstVisible(
-                doc,
-                '[data-testid="model-switcher-dropdown-button"], [data-testid="model-switcher"], [aria-label="Select ChatGPT model"]',
-              )
-                ?.textContent?.trim()
-                .slice(0, 150) || "ChatGPT · browser selection";
+              !selectorLabel || /^thinking effort/i.test(selectorLabel)
+                ? "ChatGPT · browser selection"
+                : selectorLabel;
             return { text, model, images };
           }
         }

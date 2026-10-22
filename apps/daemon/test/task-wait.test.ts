@@ -122,3 +122,85 @@ it("drains submissions immediately and serially without waiting for the fallback
   await vi.advanceTimersByTimeAsync(1000);
   expect(execute).toHaveBeenCalledTimes(5);
 });
+
+it("returns newer progress immediately when a cursor is supplied", async () => {
+  const store = fixture();
+  const task = store.submit(request()).task;
+  store.transition(task.id, "RUNNING");
+  store.reportProgress(task.id, "opening_browser");
+  const subscribe = vi.spyOn(store, "onTaskChange");
+  expect(await waitForTask(store, task.id, 30_000, undefined, 0)).toMatchObject(
+    {
+      status: "RUNNING",
+      progress: { stage: "opening_browser", revision: 1 },
+    },
+  );
+  expect(subscribe).not.toHaveBeenCalled();
+});
+
+it("waits for newer progress on the requested task and cleans up", async () => {
+  vi.useFakeTimers();
+  const store = fixture();
+  const task = store.submit(request()).task;
+  const other = store.submit(request()).task;
+  store.transition(task.id, "RUNNING");
+  store.transition(other.id, "RUNNING");
+  const controller = new AbortController();
+  const removeAbort = vi.spyOn(controller.signal, "removeEventListener");
+  const unsubscribe = vi.fn();
+  const subscribe = store.onTaskChange.bind(store);
+  vi.spyOn(store, "onTaskChange").mockImplementation((listener) => {
+    const remove = subscribe(listener);
+    return () => {
+      unsubscribe();
+      remove();
+    };
+  });
+  const finished = vi.fn();
+  const waiting = waitForTask(
+    store,
+    task.id,
+    30_000,
+    controller.signal,
+    0,
+  ).then(finished);
+  store.reportProgress(other.id, "opening_browser");
+  store.reportProgress(task.id, "queued");
+  await Promise.resolve();
+  expect(finished).not.toHaveBeenCalled();
+  store.reportProgress(task.id, "opening_browser");
+  await waiting;
+  expect(finished).toHaveBeenCalledWith(
+    expect.objectContaining({
+      id: task.id,
+      progress: expect.objectContaining({ revision: 1 }),
+    }),
+  );
+  expect(unsubscribe).toHaveBeenCalledOnce();
+  expect(removeAbort).toHaveBeenCalledWith("abort", expect.any(Function));
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("keeps terminal-only waiting when no progress cursor is supplied", async () => {
+  const store = fixture();
+  const task = store.submit(request()).task;
+  const finished = vi.fn();
+  const waiting = waitForTask(store, task.id, 1000).then(finished);
+  store.transition(task.id, "RUNNING");
+  store.reportProgress(task.id, "opening_browser");
+  await Promise.resolve();
+  expect(finished).not.toHaveBeenCalled();
+  store.transition(task.id, "FAILED");
+  await waiting;
+  expect(finished).toHaveBeenCalledWith(
+    expect.objectContaining({ status: "FAILED" }),
+  );
+});
+
+it("returns a terminal transition even when its progress revision does not advance", async () => {
+  const store = fixture();
+  const task = store.submit(request()).task;
+  const waiting = waitForTask(store, task.id, 1000, undefined, 99);
+  store.transition(task.id, "CANCELLED");
+  expect(await waiting).toMatchObject({ status: "CANCELLED" });
+});

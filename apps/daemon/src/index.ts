@@ -1,5 +1,6 @@
 import { createServer } from "./server.js";
 import { runtime } from "./config.js";
+import { shutdownRuntime } from "./runtime-shutdown.js";
 
 const HOST = "127.0.0.1";
 
@@ -15,14 +16,15 @@ async function main() {
     if (signal) console.log(`Received ${signal}; shutting down.`);
 
     try {
-      await server.close();
-    } finally {
-      try {
-        await app.worker.stop();
-      } finally {
-        app.store.close();
-        app.release();
-      }
+      await shutdownRuntime({
+        stopWorker: () => app.worker.stop(),
+        closeServer: () => server.close(),
+        closeStore: () => app.store.close(),
+        release: () => app.release(),
+      });
+    } catch (error) {
+      console.error("Daemon shutdown failed", error);
+      process.exitCode = 1;
     }
   };
 

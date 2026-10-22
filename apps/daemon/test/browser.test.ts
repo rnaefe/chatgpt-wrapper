@@ -43,6 +43,75 @@ function accept(doc: Document, req = request()) {
 }
 
 describe("ChatGPT page engine (DOM fixtures)", () => {
+  it("collects only the follow-up reply even when identical history is rerendered", async () => {
+    const doc = page();
+    const req = taskRequestSchema.parse({
+      capability: "reason.analyze",
+      objective: "Explain this again",
+      conversationId: "123e4567-e89b-42d3-a456-426614174000",
+    });
+    doc.defaultView!.history.replaceState(null, "", `/c/${req.conversationId}`);
+    addTurn(doc, "user", "").content.textContent = promptFor(req);
+    const old = addTurn(
+      doc,
+      "assistant",
+      '<div class="markdown">Previous answer</div>',
+    );
+    const copy = doc.createElement("button");
+    copy.setAttribute("aria-label", "Copy");
+    old.article.append(copy);
+    let sends = 0;
+    doc.querySelector("button")!.addEventListener("click", () => {
+      sends++;
+      // React may replace historical DOM nodes before the new user turn appears.
+      for (const article of Array.from(doc.querySelectorAll("article")))
+        article.replaceWith(article.cloneNode(true));
+      setTimeout(() => {
+        accept(doc, req);
+        const fresh = addTurn(
+          doc,
+          "assistant",
+          '<div class="markdown">Fresh follow-up answer</div>',
+        );
+        fresh.article.append(copy.cloneNode(true));
+      }, 80);
+    });
+    const result = await executeInPage(
+      doc,
+      req,
+      new AbortController().signal,
+      short,
+    );
+    expect(sends).toBe(1);
+    expect(result.text).toBe("Fresh follow-up answer");
+    expect(result.text).not.toContain("Previous answer");
+  });
+  it("never sends a continuation after navigation changes its conversation", async () => {
+    const doc = page();
+    const req = taskRequestSchema.parse({
+      capability: "reason.analyze",
+      objective: "Continue",
+      conversationId: "123e4567-e89b-42d3-a456-426614174000",
+    });
+    doc.defaultView!.history.replaceState(null, "", `/c/${req.conversationId}`);
+    let sends = 0;
+    doc.querySelector("button")!.addEventListener("click", () => {
+      sends++;
+    });
+    await expect(
+      executeInPage(doc, req, new AbortController().signal, {
+        ...short,
+        onProgress: (stage) => {
+          if (stage === "submitting_prompt")
+            doc.defaultView!.history.replaceState(null, "", "/");
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "CONVERSATION_CHANGED",
+      status: "NEEDS_HUMAN",
+    });
+    expect(sends).toBe(0);
+  });
   it("submits exactly once and preserves code from a completed response", async () => {
     const doc = page();
     let clicks = 0;

@@ -83,6 +83,36 @@ describe("durable queue", () => {
     ).toThrow(ConflictError);
     expect(store.list()).toHaveLength(1);
   });
+  it("deduplicates canonical selection inputs and rejects changed model or conversation", () => {
+    const { store } = fixture();
+    const options = {
+      idempotencyKey: "selection-once",
+      model: "Visible label",
+      conversationId: "550e8400-e29b-41d4-a716-446655440000",
+    };
+    const first = store.submit(request(options));
+    expect(
+      store.submit(
+        request({
+          ...options,
+          model: "  Visible label  ",
+          conversationId: options.conversationId.toUpperCase(),
+        }),
+      ),
+    ).toMatchObject({
+      reused: true,
+      task: { id: first.task.id },
+    });
+    for (const changed of [
+      { model: "Other visible label" },
+      { conversationId: "550e8400-e29b-41d4-a716-446655440001" },
+    ]) {
+      expect(() => store.submit(request({ ...options, ...changed }))).toThrow(
+        ConflictError,
+      );
+    }
+    expect(store.list()).toHaveLength(1);
+  });
   it("persists across restarts and never replays interrupted execution", () => {
     const { store, directory } = fixture();
     const a = store.submit(request()).task;
@@ -103,6 +133,23 @@ describe("durable queue", () => {
       ]);
     } finally {
       second.close();
+    }
+  });
+  it("reads persisted requests and results without optional selection metadata", async () => {
+    const f = fixture(success);
+    const task = f.store.submit(request()).task;
+    await f.worker.tick();
+    const reopened = new Store(f.directory);
+    try {
+      const stored = reopened.get(task.id)!;
+      expect(stored.status).toBe("COMPLETED");
+      expect(stored.request).not.toHaveProperty("model");
+      expect(stored.request).not.toHaveProperty("conversationId");
+      expect(stored.result?.text).toBe("A verified test result.");
+      expect(stored.result).not.toHaveProperty("conversationId");
+      expect(stored.result).not.toHaveProperty("conversationUrl");
+    } finally {
+      reopened.close();
     }
   });
   it("protects terminal states and rejects invalid transitions", () => {
@@ -166,6 +213,62 @@ describe("durable queue", () => {
 });
 
 describe("HTTP and worker", () => {
+  it("persists HTTP selection inputs and returns conversation metadata after worker execution", async () => {
+    const conversationId = "550e8400-e29b-41d4-a716-446655440000";
+    const conversationUrl = `https://chatgpt.com/c/${conversationId}`;
+    const execute = vi.fn<Adapter["execute"]>(async () => ({
+      text: "A verified test result.",
+      adapter: "test",
+      model: "Visible label",
+      conversationId,
+      conversationUrl,
+    }));
+    const f = fixture({ ...success, execute });
+    const server = http(f);
+    const submitted = await server.inject({
+      method: "POST",
+      url: "/v1/tasks",
+      headers: auth,
+      payload: {
+        capability: "reason.analyze",
+        objective: "Continue this conversation",
+        model: "  Visible label  ",
+        conversationId: conversationId.toUpperCase(),
+      },
+    });
+    expect(submitted.statusCode).toBe(202);
+    const id = submitted.json().id;
+    const persisted = new Store(f.directory);
+    try {
+      expect(persisted.get(id)?.request).toMatchObject({
+        model: "Visible label",
+        conversationId,
+      });
+    } finally {
+      persisted.close();
+    }
+    await f.worker.tick();
+    expect(execute).toHaveBeenCalledOnce();
+    expect(execute.mock.calls[0][0]).toMatchObject({
+      model: "Visible label",
+      conversationId,
+    });
+    expect(
+      (await server.inject({ url: `/v1/tasks/${id}`, headers: auth })).json(),
+    ).toMatchObject({
+      status: "COMPLETED",
+      result: { conversationId, conversationUrl },
+    });
+    const reopened = new Store(f.directory);
+    try {
+      expect(reopened.get(id)?.result).toMatchObject({
+        conversationId,
+        conversationUrl,
+      });
+    } finally {
+      reopened.close();
+    }
+  });
   it.each(["image.generate", "image.edit"])(
     "stores %s without an empty text artifact",
     async (capability) => {
@@ -277,6 +380,59 @@ describe("HTTP and worker", () => {
     ).toBe(401);
   });
 
+  it("returns newer HTTP progress snapshots and wakes pending cursor waits", async () => {
+    const f = fixture();
+    const server = http(f);
+    const task = f.store.submit(request()).task;
+    f.store.transition(task.id, "RUNNING");
+    f.store.reportProgress(task.id, "opening_browser");
+    const immediate = await server.inject({
+      url: `/v1/tasks/${task.id}/wait?waitMs=30000&afterProgressRevision=0`,
+      headers: auth,
+    });
+    expect(immediate.statusCode).toBe(200);
+    expect(immediate.json()).toMatchObject({
+      status: "RUNNING",
+      progress: { stage: "opening_browser", revision: 1 },
+    });
+    const subscribe = f.store.onTaskChange.bind(f.store);
+    let registered!: () => void;
+    const listening = new Promise<void>((resolve) => {
+      registered = resolve;
+    });
+    vi.spyOn(f.store, "onTaskChange").mockImplementation((listener) => {
+      const unsubscribe = subscribe(listener);
+      registered();
+      return unsubscribe;
+    });
+    const pending = server
+      .inject({
+        url: `/v1/tasks/${task.id}/wait?waitMs=30000&afterProgressRevision=1`,
+        headers: auth,
+      })
+      .then((response) => response);
+    await listening;
+    f.store.reportProgress(task.id, "preparing_chat");
+    expect((await pending).json()).toMatchObject({
+      status: "RUNNING",
+      progress: { stage: "preparing_chat", revision: 2 },
+    });
+  });
+
+  it.each(["-1", "1.5", "nope", "", "9007199254740992"])(
+    "rejects invalid HTTP progress cursor %j",
+    async (cursor) => {
+      const f = fixture();
+      const task = f.store.submit(request()).task;
+      const server = http(f);
+      const response = await server.inject({
+        url: `/v1/tasks/${task.id}/wait?waitMs=0&afterProgressRevision=${cursor}`,
+        headers: auth,
+      });
+      expect(response.statusCode).toBe(400);
+    },
+  );
+
   it("requires auth and rejects hostile origins and hosts", async () => {
     const server = http(fixture());
     await server.listen({ port: 0, host: "127.0.0.1" });
@@ -317,11 +473,20 @@ describe("HTTP and worker", () => {
       await server.inject({ url: `/v1/tasks/${id}`, headers: auth })
     ).json();
     expect(task.status).toBe("COMPLETED");
-    expect(task.events.map((e: { status: string }) => e.status)).toEqual([
-      "QUEUED",
-      "RUNNING",
-      "VALIDATING",
-      "COMPLETED",
+    expect([
+      ...new Set(task.events.map((e: { status: string }) => e.status)),
+    ]).toEqual(["QUEUED", "RUNNING", "VALIDATING", "COMPLETED"]);
+    expect(
+      task.events
+        .filter((event: { progress?: { stage: string } }) => event.progress)
+        .map((event: { progress: { stage: string } }) => event.progress.stage),
+    ).toEqual([
+      "queued",
+      "queued",
+      "queued",
+      "validating",
+      "saving_result",
+      "completed",
     ]);
     const artifact = await server.inject({
       url: `/v1/artifacts/${task.result.artifacts[0].id}`,
@@ -444,7 +609,14 @@ describe("HTTP and worker", () => {
 
 describe("MCP protocol", () => {
   it("connects over stdio and shares the HTTP queue and artifacts", async () => {
-    const f = fixture(success);
+    const conversationId = "550e8400-e29b-41d4-a716-446655440000";
+    const conversationUrl = `https://chatgpt.com/c/${conversationId}`;
+    const execute = vi.fn<Adapter["execute"]>(async () => ({
+      ...(await success.execute(request(), new AbortController().signal)),
+      conversationId,
+      conversationUrl,
+    }));
+    const f = fixture({ ...success, execute });
     const server = http(f);
     await server.listen({ port: 0, host: "127.0.0.1" });
     const transport = new StdioClientTransport({
@@ -480,12 +652,28 @@ describe("MCP protocol", () => {
       arguments: {
         capability: "reason.analyze",
         objective: "MCP end-to-end test",
+        model: "  Visible label  ",
+        conversationId: conversationId.toUpperCase(),
       },
     });
     const task = JSON.parse(
       (submitted.content as Array<{ text: string }>)[0].text,
     );
-    expect(f.store.get(task.id)?.status).toBe("QUEUED");
+    expect(f.store.get(task.id)).toMatchObject({
+      status: "QUEUED",
+      request: { model: "Visible label", conversationId },
+    });
+    f.store.reportProgress(task.id, "opening_browser");
+    const progress = await client.callTool({
+      name: "wait_task",
+      arguments: { id: task.id, waitMs: 1000, afterProgressRevision: 0 },
+    });
+    expect(
+      JSON.parse((progress.content as Array<{ text: string }>)[0].text),
+    ).toMatchObject({
+      status: "QUEUED",
+      progress: { stage: "opening_browser", revision: 1 },
+    });
     const waiting = client.callTool({
       name: "wait_task",
       arguments: { id: task.id, waitMs: 1000 },
@@ -502,7 +690,14 @@ describe("MCP protocol", () => {
     const done = JSON.parse(
       (result.content as Array<{ text: string }>)[0].text,
     );
-    expect(done.status).toBe("COMPLETED");
+    expect(done).toMatchObject({
+      status: "COMPLETED",
+      result: { conversationId, conversationUrl },
+    });
+    expect(execute.mock.calls[0][0]).toMatchObject({
+      model: "Visible label",
+      conversationId,
+    });
     const waited = await client.callTool({
       name: "wait_task",
       arguments: { id: task.id },

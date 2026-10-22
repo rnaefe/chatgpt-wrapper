@@ -1,10 +1,13 @@
 import { ProviderError } from "@chatgpt-wrapper/adapters";
-import type { TaskRequest } from "@chatgpt-wrapper/contracts";
+import {
+  MAX_IMAGE_BYTES,
+  MAX_TOTAL_IMAGE_BYTES,
+  type TaskRequest,
+} from "@chatgpt-wrapper/contracts";
 import type { Page } from "playwright";
 import { isAbsolute, sep } from "node:path";
 import { readFile, realpath, stat } from "node:fs/promises";
 
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_MIMES = new Set([
   "image/png",
   "image/jpeg",
@@ -159,9 +162,18 @@ export async function uploadImages(
   signal?: AbortSignal,
 ): Promise<Array<{ source: "path" | "base64" | "url"; name: string }>> {
   if (!inputs?.length) return [];
-  const files = await Promise.all(
-    inputs.map((input) => resolveImageInput(input, signal)),
-  );
+  const files: UploadFile[] = [];
+  let totalBytes = 0;
+  for (const input of inputs) {
+    const file = await resolveImageInput(input, signal);
+    totalBytes += file.buffer.length;
+    if (totalBytes > MAX_TOTAL_IMAGE_BYTES)
+      throw new ProviderError(
+        "IMAGE_INPUTS_TOO_LARGE",
+        "Combined image inputs exceed 20 MiB.",
+      );
+    files.push(file);
+  }
   signal?.throwIfAborted();
   const attachmentButton = page
     .locator(
@@ -209,23 +221,47 @@ export async function downloadImages(
 ) {
   return Promise.all(
     images.map(async (image) => {
-      const result = await page.evaluate(async (src) => {
-        const response = await fetch(src);
-        if (!response.ok)
-          throw new Error(`Image download failed: ${response.status}`);
-        const bytes = new Uint8Array(await response.arrayBuffer());
-        if (bytes.length > 10 * 1024 * 1024)
-          throw new Error("Image exceeds 10 MiB");
-        let binary = "";
-        for (let offset = 0; offset < bytes.length; offset += 0x8000)
-          binary += String.fromCharCode(
-            ...bytes.subarray(offset, offset + 0x8000),
-          );
-        return {
-          data: btoa(binary),
-          mime: response.headers.get("content-type") ?? undefined,
-        };
-      }, image.src);
+      const result = await page.evaluate(
+        async ({ src, maxBytes }) => {
+          const response = await fetch(src);
+          if (!response.ok)
+            throw new Error(`Image download failed: ${response.status}`);
+          if (!response.body) throw new Error("Image response has no body");
+          const reader = response.body.getReader();
+          const chunks: Uint8Array[] = [];
+          let total = 0;
+          try {
+            for (;;) {
+              const chunk = await reader.read();
+              if (chunk.done) break;
+              total += chunk.value.byteLength;
+              if (total > maxBytes) {
+                await reader.cancel();
+                throw new Error("Image exceeds 10 MiB");
+              }
+              chunks.push(chunk.value);
+            }
+          } finally {
+            reader.releaseLock();
+          }
+          const bytes = new Uint8Array(total);
+          let position = 0;
+          for (const chunk of chunks) {
+            bytes.set(chunk, position);
+            position += chunk.byteLength;
+          }
+          let binary = "";
+          for (let offset = 0; offset < bytes.length; offset += 0x8000)
+            binary += String.fromCharCode(
+              ...bytes.subarray(offset, offset + 0x8000),
+            );
+          return {
+            data: btoa(binary),
+            mime: response.headers.get("content-type") ?? undefined,
+          };
+        },
+        { src: image.src, maxBytes: MAX_IMAGE_BYTES },
+      );
       return {
         data: Buffer.from(result.data, "base64"),
         mime: image.mime ?? result.mime ?? "image/png",

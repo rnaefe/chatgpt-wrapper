@@ -14,6 +14,10 @@ Wrapper automates an authenticated, user-owned browser session through an MCP cl
 
 ## Data retention
 
+In version 0.6.0, `files` inputs can upload selected project files and documents. Path access is disabled until `FILE_INPUT_ROOTS` lists explicit absolute directories; real paths are checked against those roots. Base64 attachments do not grant local file access. Files and images share the per-task attachment budget. PDF/DOCX checks only inspect basic headers; files are sent to ChatGPT without local execution or archive extraction. Only submit approved contents. Attachment payloads and requested paths are part of private task history and subject to task retention.
+
+Research source links are untrusted provider output. Wrapper extracts them without fetching them or independently verifying their claims. Batches use the same privileged authenticated local transport as individual tasks.
+
 By default the worker periodically removes terminal tasks older than 30 days and deletes artifacts no longer referenced by retained tasks. Queued and running tasks are never deleted by retention. Configure `TASK_RETENTION_DAYS=0` to disable expiry, or set 1–3650 days. A stopped daemon cannot run cleanup; old data can remain until the next start. Credentials, the browser profile and daemon logs are **not** included in task retention. To erase all local data, stop the daemon and remove the configured `DATA_DIR` directory.
 
 ## Responsible reporting

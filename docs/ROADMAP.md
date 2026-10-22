@@ -1,6 +1,6 @@
 # Roadmap
 
-The current public release is [0.5.0](https://www.npmjs.com/package/@rnaefe/chatgpt-wrapper/v/0.5.0). The project focuses on a local browser worker and MCP, with Codex as the primary setup target.
+Version [0.6.0](https://www.npmjs.com/package/@rnaefe/chatgpt-wrapper/v/0.6.0) adds the capabilities below; the prior public npm release was 0.4.2. The project focuses on a local browser worker and MCP, with Codex as the primary setup target.
 
 ## Delivered
 
@@ -13,6 +13,10 @@ The current public release is [0.5.0](https://www.npmjs.com/package/@rnaefe/chat
 - npm distribution and isolated package installation/update/uninstall verification.
 
 Live visible coding tasks have passed on macOS. Headless was blocked by provider browser verification. Fault recovery is covered with controlled fixtures. See [browser reliability](BROWSER_RELIABILITY.md) for measured results and limits.
+
+## Version 0.6.0
+
+The release adds selected file attachments, durable batches, Search research, exact visible model selection, conversation continuation and task progress watching. These features have fixture coverage, with visible live checks for model selection, continuation, text/code file attachments and Search. Consult the measured browser results and limits before assuming provider availability.
 
 ## Next
 

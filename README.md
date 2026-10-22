@@ -17,7 +17,7 @@ _The demo is an edited product presentation using captured results; it isn't an 
 **1. Install and connect to Codex**
 
 ```bash
-npx -y @rnaefe/chatgpt-wrapper@0.5.0
+npx -y @rnaefe/chatgpt-wrapper@0.6.0
 ```
 
 The installer downloads Chromium, configures the Wrapper MCP server in Codex, and backs up any existing configuration before making changes. No clone or manual MCP config editing needed.
@@ -35,8 +35,8 @@ Your coding agent sends the task via MCP; Wrapper returns the result for review.
 **Using a different client?**
 
 ```bash
-npx -y @rnaefe/chatgpt-wrapper@0.5.0 setup --client cursor
-npx -y @rnaefe/chatgpt-wrapper@0.5.0 setup --client claude-desktop
+npx -y @rnaefe/chatgpt-wrapper@0.6.0 setup --client cursor
+npx -y @rnaefe/chatgpt-wrapper@0.6.0 setup --client claude-desktop
 ```
 
 These commands configure the selected MCP client; support for its configuration format doesn't imply every OS and browser combination has been tested. See [installation and custom paths](docs/INSTALLATION.md).
@@ -60,9 +60,11 @@ flowchart LR
 
 Wrapper is a **task bridge**, not another autonomous coding agent. Your MCP client handles planning, source files, applying changes, and reviewing generated output.
 
-Version **0.5.0** includes code generation, code review, reasoning, image generation, image analysis and image editing, plus `wait_task`, `get_status` and chat-ready image exports. Image analysis and editing require input images; live provider access remains dependent on the account and browser UI. See [MCP usage](docs/MCP.md) for task schemas and [releases](https://github.com/rnaefe/chatgpt-wrapper/releases) for shipped versions.
+Version **0.6.0** includes code generation, code review, reasoning, image generation, image analysis and image editing, plus `wait_task`, `get_status` and chat-ready image exports. Image analysis and editing require input images; live provider access remains dependent on the account and browser UI. See [MCP usage](docs/MCP.md) for task schemas and [releases](https://github.com/rnaefe/chatgpt-wrapper/releases) for shipped versions.
 
 ## Useful commands
+
+**Version 0.6.0 also includes:** selected code/PDF/DOCX attachments, durable task batches, Search research with source links, model selection, conversation continuation and terminal progress watching. See [MCP feature usage](docs/MCP.md#attach-selected-files).
 
 ```bash
 # Check your installation without starting a browser

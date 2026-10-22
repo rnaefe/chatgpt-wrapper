@@ -1,5 +1,15 @@
 # Browser reliability
 
+## Version 0.6.0 live checks — 2026-10-23
+
+The release was checked on macOS with visible Chromium and an existing signed-in profile. Two fixed public TypeScript probes completed in 12,053 ms and 10,032 ms. Explicit selection of the visible model label `GPT-5.6 Sol` completed in 8,395 ms; a follow-up in that same conversation recovered the preceding public marker in 7,071 ms. Model labels are discovered from the account UI rather than a built-in model catalog.
+
+A task with one explicitly selected local text file and one base64 TypeScript attachment completed in 22,361 ms and returned both public markers. This exercised real upload cards, including provider-added numeric filename suffixes. PDF and DOCX parsing were not separately live-tested.
+
+A Search task completed in 13,238 ms and returned a structured source link to the official `nodejs.org` documentation. MCP progress advanced through prompt submission, confirmed waiting, receiving and validation. Durable batch collection returned terminal counts and results. Earlier checks caught filename renaming, a sidebar Search name collision, virtualized history and citation icons; the release includes regressions for these cases.
+
+These checks used public fixture content and did not execute generated code or upload repository source. Existing unrelated draft text was preserved, and tasks encountering that draft stopped before submission. No new headless acceptance test was performed for this release; earlier headless restrictions below remain the available evidence.
+
 ## Live result — 2026-10-17
 
 The following coding probes ran through MCP, the local queue, a real signed-in Chromium profile, and the response collector. They were not DOM fixtures.
@@ -26,7 +36,7 @@ The public npm artifact matched the published SHA-512 integrity value. `node scr
 
 Separately, `npx -y @rnaefe/chatgpt-wrapper@0.4.0 connect --visible` reopened the existing saved profile. A code task through the existing Codex Wrapper integration completed in 11,536 ms and returned the exact requested TypeScript function. This checks saved-session reuse, not a new user sign-in or a replacement of the existing Codex integration.
 
-## Browser runtime change — unreleased
+## Browser runtime change — 0.5.0 source milestone
 
 After moving Chromium launch to `playwright-extra` without plugins, the local persistent-context Chromium fixture and all 77 tests passed. A fresh live headless probe on 2026-10-17 remained blocked before submission (`NEEDS_HUMAN` / `BROWSER_CHALLENGE`, 2,018 ms). Changing the launcher did not establish headless provider access.
 
